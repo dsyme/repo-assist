@@ -234,6 +234,15 @@ function AutomationDetail({
   onViewInGitHub: () => void
   onEditInGitHub: () => void
 }) {
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onBack()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onBack])
+
   // Content is markdown if we loaded the .md spec file
   const isMdContent = workflow.specPath != null
 

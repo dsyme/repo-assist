@@ -145,6 +145,15 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onNavigate
   const [timeline, setTimeline] = useState<PRTimelineEvent[]>([])
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   // Handle clicks on #N issue reference links in rendered markdown
   useEffect(() => {
     const handler = (e: MouseEvent) => {
