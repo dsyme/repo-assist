@@ -1,4 +1,4 @@
-# Repo Assist
+# Repo Assist App - Highly Experimental
 
 A cross-platform Electron desktop app for GitHub repository maintainers. Manage issues, pull requests, automation workflows, and CI status across multiple repos — all from one window, powered by the `gh` CLI.
 
