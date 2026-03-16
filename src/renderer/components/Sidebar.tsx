@@ -12,7 +12,6 @@ import {
   EyeIcon,
   SparkleIcon,
   SyncIcon,
-  TrashIcon,
 } from '@primer/octicons-react'
 import { NavState, RepoIssue, RepoPR, PTALItem } from '@shared/types'
 

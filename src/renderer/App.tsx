@@ -153,10 +153,6 @@ export default function App() {
     return new Date(updatedAt) > new Date(lastRead)
   }, [readState])
 
-  const getUnreadCount = useCallback((repo: string, items: { number: number; updatedAt: string }[]): number => {
-    return items.filter(item => isUnread(repo, item.number, item.updatedAt)).length
-  }, [isUnread])
-
   const refreshPTAL = useCallback(async (repoList?: string[]) => {
     const target = repoList ?? repos
     setPtalLoading(true)
