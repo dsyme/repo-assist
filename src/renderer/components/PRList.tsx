@@ -1,5 +1,5 @@
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Text, ActionList, Label, RelativeTime, Spinner } from '@primer/react'
 import {
   GitPullRequestIcon,
@@ -10,8 +10,10 @@ import {
   XCircleIcon,
   ClockIcon,
   ArrowRightIcon,
+  AlertIcon,
+  SyncIcon,
 } from '@primer/octicons-react'
-import { RepoPR } from '@shared/types'
+import { RepoPR, PRBranchStatus } from '@shared/types'
 
 interface PRListProps {
   repo: string
@@ -22,8 +24,26 @@ interface PRListProps {
 
 export function PRList({ repo, prs, writeMode, onSelectItem }: PRListProps) {
   const [markingReady, setMarkingReady] = useState<number | null>(null)
+  const [updatingBranch, setUpdatingBranch] = useState<number | null>(null)
   // Optimistic overrides for PRs mutated in this view (e.g. draft → ready)
   const [localOverrides, setLocalOverrides] = useState<Record<number, Partial<RepoPR>>>({})
+  // Cached branch status per PR number
+  const [branchStatus, setBranchStatus] = useState<Record<number, PRBranchStatus>>({})
+  const branchStatusFetched = useRef<Set<string>>(new Set())
+
+  // Asynchronously fetch branch status for each PR (cached per repo+number)
+  useEffect(() => {
+    for (const pr of prs) {
+      const key = `${repo}#${pr.number}`
+      if (branchStatusFetched.current.has(key)) continue
+      branchStatusFetched.current.add(key)
+      window.repoAssist.getPRBranchStatus(repo, pr.number).then(status => {
+        setBranchStatus(prev => ({ ...prev, [pr.number]: status }))
+      }).catch(() => {
+        // Ignore failures — status stays unknown
+      })
+    }
+  }, [repo, prs])
 
   // Apply local overrides to props
   const effectivePRs = prs.map(pr => localOverrides[pr.number] ? { ...pr, ...localOverrides[pr.number] } : pr)
@@ -56,6 +76,18 @@ export function PRList({ repo, prs, writeMode, onSelectItem }: PRListProps) {
       setLocalOverrides(prev => ({ ...prev, [prNumber]: { isDraft: false } }))
     } finally {
       setMarkingReady(null)
+    }
+  }
+
+  const handleUpdateBranch = async (e: React.MouseEvent, prNumber: number) => {
+    e.stopPropagation()
+    setUpdatingBranch(prNumber)
+    try {
+      await window.repoAssist.updatePRBranch(repo, prNumber)
+      // Optimistic update: mark as up-to-date
+      setBranchStatus(prev => ({ ...prev, [prNumber]: { behindBy: 0, status: 'up_to_date' } }))
+    } finally {
+      setUpdatingBranch(null)
     }
   }
 
@@ -93,6 +125,11 @@ export function PRList({ repo, prs, writeMode, onSelectItem }: PRListProps) {
                   </Text>
                   <div className="pr-meta">
                     {renderCIIcons(pr)}
+                    {branchStatus[pr.number]?.status === 'behind' && (
+                      <span className="ci-icon-group" title={`${branchStatus[pr.number].behindBy} commit${branchStatus[pr.number].behindBy !== 1 ? 's' : ''} behind base branch`}>
+                        <AlertIcon size={14} className="gh-icon-attention" />
+                      </span>
+                    )}
                     {isBot && (
                       <Label variant="accent">🤖 Repo Assist</Label>
                     )}
@@ -103,23 +140,38 @@ export function PRList({ repo, prs, writeMode, onSelectItem }: PRListProps) {
                   </div>
                 </div>
               </ActionList.Item>
-              {pr.isDraft && (
-                <span
-                  className="draft-ready-btn"
-                  title="Mark as ready for review"
-                  onClick={(e) => handleMarkReady(e, pr.number)}
-                >
-                  {markingReady === pr.number ? (
-                    <Spinner size="small" />
-                  ) : (
-                    <>
-                      <GitPullRequestDraftIcon size={14} className="gh-icon-draft" />
-                      <ArrowRightIcon size={10} />
-                      <GitPullRequestIcon size={14} className="gh-icon-open" />
-                    </>
-                  )}
-                </span>
-              )}
+              <div className="pr-hover-actions">
+                {branchStatus[pr.number]?.status === 'behind' && (
+                  <span
+                    className="update-branch-btn"
+                    title={`Update branch (${branchStatus[pr.number].behindBy} commit${branchStatus[pr.number].behindBy !== 1 ? 's' : ''} behind)`}
+                    onClick={(e) => handleUpdateBranch(e, pr.number)}
+                  >
+                    {updatingBranch === pr.number ? (
+                      <Spinner size="small" />
+                    ) : (
+                      <SyncIcon size={14} className="gh-icon-attention" />
+                    )}
+                  </span>
+                )}
+                {pr.isDraft && (
+                  <span
+                    className="draft-ready-btn"
+                    title="Mark as ready for review"
+                    onClick={(e) => handleMarkReady(e, pr.number)}
+                  >
+                    {markingReady === pr.number ? (
+                      <Spinner size="small" />
+                    ) : (
+                      <>
+                        <GitPullRequestDraftIcon size={14} className="gh-icon-draft" />
+                        <ArrowRightIcon size={10} />
+                        <GitPullRequestIcon size={14} className="gh-icon-open" />
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
             </div>
           )
         })}

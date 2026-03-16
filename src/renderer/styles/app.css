@@ -902,11 +902,18 @@ li:hover .sidebar-item-row .sidebar-refresh-btn {
 .pr-list-item-wrapper {
   position: relative;
 }
-.draft-ready-btn {
+.pr-hover-actions {
   position: absolute;
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 1;
+}
+.draft-ready-btn,
+.update-branch-btn {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -915,12 +922,13 @@ li:hover .sidebar-item-row .sidebar-refresh-btn {
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
-  z-index: 1;
 }
-.pr-list-item-wrapper:hover .draft-ready-btn {
+.pr-list-item-wrapper:hover .draft-ready-btn,
+.pr-list-item-wrapper:hover .update-branch-btn {
   opacity: 0.7;
 }
-.draft-ready-btn:hover {
+.draft-ready-btn:hover,
+.update-branch-btn:hover {
   opacity: 1 !important;
   background: var(--control-transparent-bgColor-hover, #1c2128);
 }

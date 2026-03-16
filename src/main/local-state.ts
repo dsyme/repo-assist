@@ -70,10 +70,19 @@ export class LocalState {
     if (key) {
       const data = readJson(RECAP_CACHE_FILE)
       delete data[key]
+      // Store the cleared-at timestamp for this key
+      data[`${key}__clearedAt`] = new Date().toISOString()
       writeJson(RECAP_CACHE_FILE, data)
     } else {
-      writeJson(RECAP_CACHE_FILE, {})
+      // Store a global cleared-at timestamp
+      writeJson(RECAP_CACHE_FILE, { '__all____clearedAt': new Date().toISOString() })
     }
+  }
+
+  getRecapClearedAt(key: string): string | null {
+    const data = readJson(RECAP_CACHE_FILE)
+    const ts = data[`${key}__clearedAt`]
+    return typeof ts === 'string' ? ts : null
   }
 
   // Write mode

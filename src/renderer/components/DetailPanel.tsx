@@ -18,9 +18,11 @@ import {
   ClockIcon,
   GitCommitIcon,
   SkipIcon,
+  SyncIcon,
+  AlertIcon,
 } from '@primer/octicons-react'
 import { marked } from 'marked'
-import { IssueDetail, PRDetail, PRCheck, PRTimelineEvent } from '@shared/types'
+import { IssueDetail, PRDetail, PRCheck, PRTimelineEvent, PRBranchStatus } from '@shared/types'
 
 // Configure marked for GitHub-flavored markdown
 marked.setOptions({
@@ -143,6 +145,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose }: DetailPa
   const [ciChecks, setCiChecks] = useState<PRCheck[]>([])
   const [timeline, setTimeline] = useState<PRTimelineEvent[]>([])
   const [closing, setClosing] = useState(false)
+  const [branchStatus, setBranchStatus] = useState<PRBranchStatus | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Close on Escape key
@@ -161,6 +164,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose }: DetailPa
     setPrDetail(null)
     setPrDiff(null)
     setVisibleComments(INITIAL_COMMENT_COUNT)
+    setBranchStatus(null)
 
     const load = async () => {
       try {
@@ -177,6 +181,10 @@ export function DetailPanel({ type, repo, number, writeMode, onClose }: DetailPa
           setPrDiff(diff)
           setTimeline(tl)
           if (detail?.statusCheckRollup) setCiChecks(detail.statusCheckRollup)
+          // Fetch branch status asynchronously
+          window.repoAssist.getPRBranchStatus(repo, number).then(status => {
+            setBranchStatus(status)
+          }).catch(() => {})
         }
       } catch (err) {
         setError(`Failed to load details: ${err}`)
@@ -321,6 +329,19 @@ export function DetailPanel({ type, repo, number, writeMode, onClose }: DetailPa
       // Refresh detail and list data
       const detail = await window.repoAssist.getPRDetail(repo, number)
       setPrDetail(detail)
+    } catch (err) {
+      setActionStatus(`Failed: ${err}`)
+    }
+    setTimeout(() => setActionStatus(null), 3000)
+  }
+
+  const handleUpdateBranch = async () => {
+    setActionStatus('Updating branch…')
+    try {
+      await window.repoAssist.updatePRBranch(repo, number)
+      setActionStatus(writeMode ? 'Branch updated!' : 'Update logged (dry-run, read-only mode)')
+      // Optimistic update
+      setBranchStatus({ behindBy: 0, status: 'up_to_date' })
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
     }
@@ -613,6 +634,17 @@ export function DetailPanel({ type, repo, number, writeMode, onClose }: DetailPa
         {/* CI Status Checks */}
         {ciChecks.length > 0 && (
           <CIChecksPanel checks={ciChecks} openExternal={window.repoAssist.openExternal} />
+        )}
+
+        {/* Branch status — behind base */}
+        {branchStatus?.status === 'behind' && (
+          <Flash variant="warning" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertIcon size={16} />
+            <span>Branch is {branchStatus.behindBy} commit{branchStatus.behindBy !== 1 ? 's' : ''} behind {prDetail.headRefName ? 'the base branch' : 'base'}</span>
+            <Button size="small" leadingVisual={SyncIcon} onClick={handleUpdateBranch} style={{ marginLeft: 'auto' }}>
+              {writeMode ? 'Update branch' : 'Update branch (dry-run)'}
+            </Button>
+          </Flash>
         )}
 
         {/* Actions */}

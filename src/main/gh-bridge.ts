@@ -127,7 +127,7 @@ export class GhBridge {
 
   async getPRs(repo: string): Promise<unknown[]> {
     const result = await this.exec(
-      `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,statusCheckRollup,createdAt,updatedAt,labels,headRefName --limit 50 --state open`
+      `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,statusCheckRollup,createdAt,updatedAt,labels,headRefName,baseRefName --limit 50 --state open`
     )
     if (result.exitCode !== 0) return []
     try {
@@ -224,6 +224,45 @@ export class GhBridge {
     }
     return this.exec(command, 'write')
   }
+
+  /** Check if a PR branch is behind its base branch */
+  async getPRBranchStatus(repo: string, number: number): Promise<{ behindBy: number; status: string }> {
+    // Get the PR's head and base refs
+    const prResult = await this.exec(
+      `pr view ${number} -R ${repo} --json headRefName,baseRefName`
+    )
+    if (prResult.exitCode !== 0) return { behindBy: 0, status: 'unknown' }
+    try {
+      const pr = JSON.parse(prResult.stdout) as { headRefName: string; baseRefName: string }
+      // Compare base...head to find how far behind the PR is
+      const compareResult = await this.exec(
+        `api repos/${repo}/compare/${pr.headRefName}...${pr.baseRefName} --jq .behind_by`
+      )
+      if (compareResult.exitCode !== 0) return { behindBy: 0, status: 'unknown' }
+      const behindBy = parseInt(compareResult.stdout.trim(), 10)
+      if (isNaN(behindBy)) return { behindBy: 0, status: 'unknown' }
+      return { behindBy, status: behindBy > 0 ? 'behind' : 'up_to_date' }
+    } catch {
+      return { behindBy: 0, status: 'unknown' }
+    }
+  }
+
+  /** Update a PR branch by merging the base branch into the head */
+  async updatePRBranch(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `api repos/${repo}/pulls/${number}/update-branch -X PUT`
+    if (!writeMode) {
+      this.addToLog({
+        command: `gh ${command}`,
+        startedAt: new Date().toISOString(),
+        durationMs: 0,
+        exitCode: 0,
+        mode: 'dry-run'
+      })
+      return { stdout: '[DRY RUN] PR branch would be updated', stderr: '', exitCode: 0, command: `gh ${command}`, durationMs: 0 }
+    }
+    return this.exec(command, 'write')
+  }
+
 
   async getPRDiff(repo: string, number: number): Promise<string> {
     const result = await this.exec(
@@ -438,7 +477,10 @@ export class GhBridge {
   }
 
   /** Generate AI recap summary from recent activity across repos */
-  async generateRecap(repos: string[], clearedState: Record<string, string>): Promise<{ markdown: string }> {
+  async generateRecap(repos: string[], clearedState: Record<string, string>, sinceDate?: string): Promise<{ markdown: string }> {
+    // Use sinceDate (from last clear) or default to 2 weeks ago
+    const cutoff = sinceDate ? new Date(sinceDate) : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
+
     // Phase 1: Gather automation items (single scan, filter locally for PTAL)
     const allAutomationItems = await this.scanPTAL(repos, {})
     const ptalItems = allAutomationItems.filter(item =>
@@ -448,15 +490,18 @@ export class GhBridge {
     // Phase 2: Gather supplementary data in parallel across repos
     const supplementary = await Promise.all(repos.map(async repo => {
       const [merged, closed, newIssues] = await Promise.all([
-        this.getRecentMergedPRs(repo),
-        this.getRecentClosedIssues(repo),
-        this.getRecentNewIssues(repo),
+        this.getRecentMergedPRs(repo, cutoff),
+        this.getRecentClosedIssues(repo, cutoff),
+        this.getRecentNewIssues(repo, cutoff),
       ])
       return { repo, merged, closed, newIssues }
     }))
 
     // Build categorised data for the prompt
     const sections: string[] = []
+
+    // Filter automation items by cutoff date
+    const cutoffAutomation = allAutomationItems.filter(item => new Date(item.lastActivity.when) >= cutoff)
 
     // Helper to make a GitHub link for an issue/PR number
     const ghLink = (repo: string, type: 'issue' | 'pr', num: number) => {
@@ -466,7 +511,7 @@ export class GhBridge {
 
     // Build reference map for post-processing enrichment
     const refMap = new Map<string, RefInfo>()
-    for (const item of allAutomationItems) {
+    for (const item of cutoffAutomation) {
       const pathType = item.type === 'pr' ? 'pull' : 'issues'
       refMap.set(`${item.repo}/${pathType}/${item.number}`, { title: item.title, state: 'open', type: item.type })
     }
@@ -482,9 +527,9 @@ export class GhBridge {
       }
     }
 
-    // Automation items (open, with attention status)
+    // Automation items (open, with attention status) — filtered by cutoff
     const automationLines: string[] = []
-    for (const item of allAutomationItems.slice(0, 25)) {
+    for (const item of cutoffAutomation.slice(0, 25)) {
       const shortRepo = item.repo.split('/').pop() || item.repo
       const actName = item.lastActivity.automationName || item.lastActivity.actor
       const bodySnippet = item.lastActivity.body ? ` — ${item.lastActivity.body.substring(0, 120).replace(/\n/g, ' ')}` : ''
@@ -533,16 +578,30 @@ export class GhBridge {
     }
 
     if (sections.length === 0) {
-      return { markdown: 'All quiet across your repositories — nothing to report. \u{1F30A}' }
+      const today = new Date().toISOString().substring(0, 10)
+      const sinceLabel = cutoff.toISOString().substring(0, 10)
+      const singleRepo = repos.length === 1
+      const repoLabel = singleRepo
+        ? (repos[0].split('/').pop() || repos[0])
+        : 'your repositories'
+      const quietMessages = [
+        `🌊 All quiet across ${repoLabel} — nothing new to report since ${sinceLabel}. Enjoy the calm!`,
+        `☀️ Clear skies over ${repoLabel} — no new activity since ${sinceLabel}. A peaceful stretch!`,
+        `🍃 Nothing stirring in ${repoLabel} since ${sinceLabel}. A well-earned breather.`,
+        `🧘 ${repoLabel.charAt(0).toUpperCase() + repoLabel.slice(1)} ${singleRepo ? 'is' : 'are'} resting easy — zero new activity since ${sinceLabel}.`,
+        `🌙 Quiet times for ${repoLabel} since ${sinceLabel}. Nothing needs your attention right now.`,
+      ]
+      const msg = quietMessages[Math.floor(Math.random() * quietMessages.length)]
+      return { markdown: `## Recap: ${sinceLabel} – ${today}\n\n${msg}` }
     }
 
     const repoNames = repos.map(r => r.split('/').pop()).join(', ')
     const singleRepo = repos.length === 1
     const today = new Date().toISOString().substring(0, 10)
-    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10)
+    const sinceLabel = cutoff.toISOString().substring(0, 10)
     const username = await this.getUsername()
 
-    const prompt = `You are writing a brief chronicle of what's been happening ${singleRepo ? 'in the GitHub repository' : 'across these GitHub repositories'}: ${repoNames}. This is for the maintainer @${username}. Today is ${today}. This recap covers roughly ${twoWeeksAgo} to ${today}.
+    const prompt = `You are writing a brief chronicle of what's been happening ${singleRepo ? 'in the GitHub repository' : 'across these GitHub repositories'}: ${repoNames}. This is for the maintainer @${username}. Today is ${today}. This recap covers roughly ${sinceLabel} to ${today}.
 
 Write in markdown (do NOT wrap in code fences). Use ## headings to break the recap into natural sections. Write in a narrative voice — concise but with texture, like a weekly digest or changelog. Use the occasional emoji sparingly. Reference repos by their short name (e.g. "Deedle" not "fslaborg/Deedle").
 
@@ -572,15 +631,14 @@ ${sections.join('\n\n')}`
     return { markdown: output }
   }
 
-  /** Get recently merged PRs (last 2 weeks) */
-  private async getRecentMergedPRs(repo: string): Promise<{ number: number; title: string; author: string; mergedAt: string }[]> {
+  /** Get recently merged PRs since cutoff */
+  private async getRecentMergedPRs(repo: string, cutoff: Date): Promise<{ number: number; title: string; author: string; mergedAt: string }[]> {
     const result = await this.exec(
       `pr list -R ${repo} --state merged --json number,title,author,mergedAt --limit 15`
     )
     if (result.exitCode !== 0) return []
     try {
       const prs = JSON.parse(result.stdout) as { number: number; title: string; author: { login: string }; mergedAt: string }[]
-      const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
       return prs
         .filter(pr => pr.mergedAt && new Date(pr.mergedAt) > cutoff)
         .map(pr => ({ number: pr.number, title: pr.title, author: pr.author?.login ?? 'unknown', mergedAt: pr.mergedAt }))
@@ -589,15 +647,14 @@ ${sections.join('\n\n')}`
     }
   }
 
-  /** Get recently closed issues (last 2 weeks) */
-  private async getRecentClosedIssues(repo: string): Promise<{ number: number; title: string; author: string; closedAt: string }[]> {
+  /** Get recently closed issues since cutoff */
+  private async getRecentClosedIssues(repo: string, cutoff: Date): Promise<{ number: number; title: string; author: string; closedAt: string }[]> {
     const result = await this.exec(
       `issue list -R ${repo} --state closed --json number,title,author,closedAt --limit 15 --sort updated`
     )
     if (result.exitCode !== 0) return []
     try {
       const issues = JSON.parse(result.stdout) as { number: number; title: string; author: { login: string }; closedAt: string }[]
-      const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
       return issues
         .filter(i => i.closedAt && new Date(i.closedAt) > cutoff)
         .map(i => ({ number: i.number, title: i.title, author: i.author?.login ?? 'unknown', closedAt: i.closedAt }))
@@ -606,15 +663,14 @@ ${sections.join('\n\n')}`
     }
   }
 
-  /** Get recently opened issues by non-bot authors (last 2 weeks) */
-  private async getRecentNewIssues(repo: string): Promise<{ number: number; title: string; author: string; createdAt: string }[]> {
+  /** Get recently opened issues by non-bot authors since cutoff */
+  private async getRecentNewIssues(repo: string, cutoff: Date): Promise<{ number: number; title: string; author: string; createdAt: string }[]> {
     const result = await this.exec(
       `issue list -R ${repo} --state open --json number,title,author,createdAt --limit 30`
     )
     if (result.exitCode !== 0) return []
     try {
       const issues = JSON.parse(result.stdout) as { number: number; title: string; author: { login: string }; createdAt: string }[]
-      const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)
       return issues
         .filter(i => new Date(i.createdAt) > cutoff && !isAutomationActor(i.author?.login ?? ''))
         .map(i => ({ number: i.number, title: i.title, author: i.author?.login ?? 'unknown', createdAt: i.createdAt }))

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Quick-start Repo Assist — run with:
-#   curl -fsSL https://raw.githubusercontent.com/dsyme/repo-assist/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/dsyme/repo-assist-app/main/install.sh | bash
 set -e
 
-REPO="https://github.com/dsyme/repo-assist.git"
-DIR="$HOME/repo-assist"
+REPO="https://github.com/dsyme/repo-assist-app.git"
+DIR="$HOME/repo-assist-app"
 
 command -v git  >/dev/null || { echo "Error: git is required";  exit 1; }
 command -v node >/dev/null || { echo "Error: Node.js >= 20 is required"; exit 1; }
@@ -13,7 +13,7 @@ command -v gh   >/dev/null || { echo "Error: GitHub CLI (gh) is required — htt
 # Check gh auth
 gh auth status >/dev/null 2>&1 || { echo "Error: run 'gh auth login' first"; exit 1; }
 
-echo "==> Cloning repo-assist into $DIR …"
+echo "==> Cloning repo-assist-app into $DIR …"
 if [ -d "$DIR" ]; then
   cd "$DIR" && git pull --ff-only
 else

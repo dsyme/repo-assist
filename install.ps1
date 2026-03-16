@@ -1,6 +1,6 @@
 # Quick-start Repo Assist on Windows
 # Run in PowerShell:
-#   irm https://raw.githubusercontent.com/dsyme/repo-assist/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/dsyme/repo-assist-app/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -15,15 +15,15 @@ if (-not (Test-Command "gh"))   { Write-Error "GitHub CLI (gh) is required — h
 $authOut = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) { Write-Error "Run 'gh auth login' first"; exit 1 }
 
-$Dir = Join-Path $HOME "repo-assist"
+$Dir = Join-Path $HOME "repo-assist-app"
 
-Write-Host "==> Cloning repo-assist into $Dir ..." -ForegroundColor Cyan
+Write-Host "==> Cloning repo-assist-app into $Dir ..." -ForegroundColor Cyan
 if (Test-Path $Dir) {
     Push-Location $Dir
     git pull --ff-only
     Pop-Location
 } else {
-    git clone "https://github.com/dsyme/repo-assist.git" $Dir
+    git clone "https://github.com/dsyme/repo-assist-app.git" $Dir
 }
 
 Push-Location $Dir

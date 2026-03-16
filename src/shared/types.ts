@@ -23,6 +23,12 @@ export interface RepoPR {
   createdAt: string
   updatedAt: string
   headRefName: string
+  baseRefName: string
+}
+
+export interface PRBranchStatus {
+  behindBy: number
+  status: 'up_to_date' | 'behind' | 'unknown'
 }
 
 export interface RepoRun {
@@ -142,6 +148,8 @@ export interface RepoAssistAPI {
   getPRChecks: (repo: string, number: number) => Promise<PRCheck[]>
   getPRTimeline: (repo: string, number: number) => Promise<PRTimelineEvent[]>
   markPRReady: (repo: string, number: number) => Promise<unknown>
+  getPRBranchStatus: (repo: string, number: number) => Promise<PRBranchStatus>
+  updatePRBranch: (repo: string, number: number) => Promise<unknown>
   getFileContent: (repo: string, path: string) => Promise<string | null>
   closeIssue: (repo: string, number: number, reason: string) => Promise<unknown>
   searchRepos: (query: string) => Promise<{ fullName: string; description: string }[]>

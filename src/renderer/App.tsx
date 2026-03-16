@@ -56,6 +56,12 @@ export default function App() {
           })
         )
         setRepoData(Object.fromEntries(dataEntries))
+
+        // Kick off background recap generation so it's cached when the user opens the panel
+        const cachedRecap = await window.repoAssist.getRecapCache('__all__')
+        if (!cachedRecap) {
+          window.repoAssist.generateRecap(repoList).catch(() => {})
+        }
       } catch (err) {
         setError(`Failed to initialize: ${err}`)
         setLoading(false)

@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('repoAssist', {
   getPRChecks: (repo: string, number: number) => ipcRenderer.invoke('gh:getPRChecks', repo, number),
   getPRTimeline: (repo: string, number: number) => ipcRenderer.invoke('gh:getPRTimeline', repo, number),
   markPRReady: (repo: string, number: number) => ipcRenderer.invoke('gh:markPRReady', repo, number),
+  getPRBranchStatus: (repo: string, number: number) => ipcRenderer.invoke('gh:getPRBranchStatus', repo, number),
+  updatePRBranch: (repo: string, number: number) => ipcRenderer.invoke('gh:updatePRBranch', repo, number),
   getMonthlyActivity: (repo: string) => ipcRenderer.invoke('gh:getMonthlyActivity', repo),
   getEvents: (repo: string) => ipcRenderer.invoke('gh:getEvents', repo),
   getCommandLog: () => ipcRenderer.invoke('gh:getCommandLog'),

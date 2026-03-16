@@ -169,6 +169,15 @@ ipcMain.handle('gh:markPRReady', async (_event, repo: string, number: number) =>
   return ghBridge.markPRReady(repo, number, writeMode)
 })
 
+ipcMain.handle('gh:getPRBranchStatus', async (_event, repo: string, number: number) => {
+  return ghBridge.getPRBranchStatus(repo, number)
+})
+
+ipcMain.handle('gh:updatePRBranch', async (_event, repo: string, number: number) => {
+  const writeMode = localState.getWriteMode()
+  return ghBridge.updatePRBranch(repo, number, writeMode)
+})
+
 ipcMain.handle('gh:searchRepos', async (_event, query: string) => {
   return ghBridge.searchRepos(query)
 })
@@ -258,8 +267,9 @@ ipcMain.handle('state:getRecapCache', async (_event, key: string) => {
 ipcMain.handle('recap:generate', async (_event, repos: string[]) => {
   const clearedState = localState.getPTALCleared()
   const cacheKey = repos.length === 1 ? repos[0] : '__all__'
+  const sinceDate = localState.getRecapClearedAt(cacheKey) ?? undefined
   try {
-    const result = await ghBridge.generateRecap(repos, clearedState)
+    const result = await ghBridge.generateRecap(repos, clearedState, sinceDate)
     const summary = { markdown: result.markdown, generatedAt: new Date().toISOString() }
     localState.setRecapCache(cacheKey, summary)
     return summary
