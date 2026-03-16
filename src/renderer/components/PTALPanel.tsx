@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Text, ActionList, Button, Spinner, RelativeTime } from '@primer/react'
 import {
   IssueOpenedIcon,
@@ -7,14 +7,20 @@ import {
   SyncIcon,
   CommentIcon,
   GitCommitIcon,
-  TrashIcon,
+  XIcon,
 } from '@primer/octicons-react'
 import { PTALItem, NavState } from '@shared/types'
 
 interface PTALPanelProps {
   repos: string[]
+  /** Canonical PTAL items from App (single source of truth) */
+  items: PTALItem[]
+  loading: boolean
+  initialized: boolean
   /** Optional: restrict to a single repo (for repo-specific view) */
   filterRepo?: string
+  onClear: (item: PTALItem) => void
+  onRefresh: () => void
   onNavigate: (nav: NavState) => void
 }
 
@@ -38,70 +44,23 @@ function ptalActionTitle(item: PTALItem): { verb: string; number: string; title:
   return { verb: 'Review', number, title: cleanTitle }
 }
 
-export function PTALPanel({ repos, filterRepo, onNavigate }: PTALPanelProps) {
-  const [items, setItems] = useState<PTALItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [initialized, setInitialized] = useState(false)
+export function PTALPanel({ repos, items, loading, initialized, filterRepo, onClear, onRefresh, onNavigate }: PTALPanelProps) {
+  // Local clearing set: tracks items mid-animation so they render with fade-out
+  // before actually being removed from App state
   const [clearing, setClearing] = useState<Set<string>>(new Set())
 
-  // Load cached items on mount, then trigger background refresh
-  useEffect(() => {
-    let cancelled = false
-    async function init() {
-      // Show cached data immediately
-      const cached = await window.repoAssist.getPTALCache() as PTALItem[]
-      if (!cancelled && cached.length > 0) {
-        setItems(cached)
-        setInitialized(true)
-      }
-      // Then refresh in background
-      if (!cancelled && repos.length > 0) {
-        setLoading(true)
-        try {
-          const fresh = await window.repoAssist.scanPTAL(repos)
-          if (!cancelled) setItems(fresh)
-        } catch {
-          // Keep cached data on error
-        } finally {
-          if (!cancelled) {
-            setLoading(false)
-            setInitialized(true)
-          }
-        }
-      } else {
-        setInitialized(true)
-      }
-    }
-    init()
-    return () => { cancelled = true }
-  }, [repos])
-
-  const handleRefresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const fresh = await window.repoAssist.scanPTAL(repos)
-      setItems(fresh)
-    } catch {
-      // Keep current items
-    } finally {
-      setLoading(false)
-    }
-  }, [repos])
-
-  const handleClear = useCallback(async (item: PTALItem) => {
-    // Animate out
+  const handleClear = useCallback((item: PTALItem) => {
     setClearing(prev => new Set(prev).add(item.key))
-    await window.repoAssist.clearPTALItem(item.key, item.lastActivity.id)
-    // Remove after animation
+    // Persist + protect against races immediately, then remove after animation
     setTimeout(() => {
-      setItems(prev => prev.filter(i => i.key !== item.key))
+      onClear(item)
       setClearing(prev => {
         const next = new Set(prev)
         next.delete(item.key)
         return next
       })
     }, 350)
-  }, [])
+  }, [onClear])
 
   const handleItemClick = useCallback((item: PTALItem) => {
     onNavigate({
@@ -151,7 +110,7 @@ export function PTALPanel({ repos, filterRepo, onNavigate }: PTALPanelProps) {
         {!filterRepo && (
           <Button
             leadingVisual={loading ? Spinner : SyncIcon}
-            onClick={handleRefresh}
+            onClick={onRefresh}
             disabled={loading}
             size="small"
           >
@@ -222,7 +181,7 @@ export function PTALPanel({ repos, filterRepo, onNavigate }: PTALPanelProps) {
                         aria-label="Dismiss item"
                         title="Dismiss"
                       >
-                        <TrashIcon size={14} />
+                        <XIcon size={14} />
                       </button>
                     </div>
                   )

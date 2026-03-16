@@ -226,6 +226,24 @@ li:hover .sidebar-item-row .sidebar-refresh-btn {
   color: var(--fgColor-accent, #58a6ff);
 }
 
+/* Remove button on repo row — visible on hover */
+.sidebar-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  cursor: pointer;
+  color: var(--fgColor-muted, #9198a1);
+  transition: opacity 0.15s, color 0.15s;
+}
+li:hover > .sidebar-remove-btn,
+li:hover .sidebar-item-row .sidebar-remove-btn {
+  opacity: 0.6;
+}
+.sidebar-remove-btn:hover {
+  opacity: 1 !important;
+  color: var(--fgColor-danger, #f85149);
+}
+
 /* ── Center Panel ── */
 
 .center-panel {

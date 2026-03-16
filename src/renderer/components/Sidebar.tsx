@@ -13,7 +13,7 @@ import {
   SparkleIcon,
   SyncIcon,
 } from '@primer/octicons-react'
-import { NavState, RepoIssue, RepoPR } from '@shared/types'
+import { NavState, RepoIssue, RepoPR, PTALItem } from '@shared/types'
 
 interface RepoData {
   issues: RepoIssue[]
@@ -26,13 +26,13 @@ interface SidebarProps {
   repoData: Record<string, RepoData>
   nav: NavState
   onNavigate: (nav: NavState) => void
-  isUnread: (repo: string, number: number, updatedAt: string) => boolean
-  getUnreadCount: (repo: string, items: { number: number; updatedAt: string }[]) => number
+  ptalItems: PTALItem[]
   onAddRepo?: (repo: string) => void
+  onRemoveRepo?: (repo: string) => void
   onRefreshRepo?: (repo: string) => void
 }
 
-export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAddRepo, onRefreshRepo }: SidebarProps) {
+export function Sidebar({ repos, repoData, nav, onNavigate, ptalItems, onAddRepo, onRemoveRepo, onRefreshRepo }: SidebarProps) {
   const [expandedRepos, setExpandedRepos] = useState<Set<string>>(new Set())
   const [showRepoChooser, setShowRepoChooser] = useState(false)
   const [repoSearch, setRepoSearch] = useState('')
@@ -142,7 +142,12 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
           <TreeView.LeadingVisual>
             <EyeIcon />
           </TreeView.LeadingVisual>
-          <Text weight={nav.section === 'ptal' ? 'semibold' : 'normal'}>Please Take a Look</Text>
+          <span className="sidebar-item-row">
+            <Text weight={nav.section === 'ptal' ? 'semibold' : 'normal'}>Please Take a Look</Text>
+            {ptalItems.length > 0 && (
+              <CounterLabel scheme="primary">{ptalItems.length}</CounterLabel>
+            )}
+          </span>
         </TreeView.Item>
 
         {/* Add Repository button */}
@@ -161,8 +166,7 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
           const data = repoData[repo]
           const issueCount = data?.issues?.length ?? 0
           const prCount = data?.prs?.length ?? 0
-          const unreadIssues = data ? getUnreadCount(repo, data.issues) : 0
-          const unreadPRs = data ? getUnreadCount(repo, data.prs) : 0
+          const repoPtalCount = ptalItems.filter(i => i.repo === repo).length
           const isExpanded = expandedRepos.has(repo)
 
           return (
@@ -177,8 +181,8 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
               </TreeView.LeadingVisual>
               <span className="sidebar-item-row">
                 <Text weight="semibold" size="small">{repoShortName(repo)}</Text>
-                {(unreadIssues + unreadPRs) > 0 && (
-                  <CounterLabel scheme="primary">{unreadIssues + unreadPRs}</CounterLabel>
+                {repoPtalCount > 0 && (
+                  <CounterLabel scheme="primary">{repoPtalCount}</CounterLabel>
                 )}
                 {onRefreshRepo && (
                   <span
@@ -187,6 +191,15 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
                     onClick={(e) => { e.stopPropagation(); onRefreshRepo(repo) }}
                   >
                     {data?.loading ? <Spinner size="small" /> : <SyncIcon size={14} />}
+                  </span>
+                )}
+                {onRemoveRepo && (
+                  <span
+                    className="sidebar-remove-btn"
+                    title="Remove repository"
+                    onClick={(e) => { e.stopPropagation(); onRemoveRepo(repo) }}
+                  >
+                    <XIcon size={14} />
                   </span>
                 )}
               </span>
@@ -213,7 +226,12 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
                   <TreeView.LeadingVisual>
                     <EyeIcon />
                   </TreeView.LeadingVisual>
-                  <Text>Please Take a Look</Text>
+                  <span className="sidebar-item-row">
+                    <Text>Please Take a Look</Text>
+                    {repoPtalCount > 0 && (
+                      <CounterLabel scheme="primary">{repoPtalCount}</CounterLabel>
+                    )}
+                  </span>
                 </TreeView.Item>
 
                 {/* Automations */}
@@ -240,9 +258,6 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
                   <span className="sidebar-item-row">
                     <Text>Issues</Text>
                     <CounterLabel>{issueCount}</CounterLabel>
-                    {unreadIssues > 0 && (
-                      <CounterLabel scheme="primary">{unreadIssues} new</CounterLabel>
-                    )}
                   </span>
                 </TreeView.Item>
 
@@ -258,9 +273,6 @@ export function Sidebar({ repos, repoData, nav, onNavigate, getUnreadCount, onAd
                   <span className="sidebar-item-row">
                     <Text>Pull Requests</Text>
                     <CounterLabel>{prCount}</CounterLabel>
-                    {unreadPRs > 0 && (
-                      <CounterLabel scheme="primary">{unreadPRs} new</CounterLabel>
-                    )}
                   </span>
                 </TreeView.Item>
               </TreeView.SubTree>

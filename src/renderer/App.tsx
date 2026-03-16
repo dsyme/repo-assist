@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Flash, ToggleSwitch, Text } from '@primer/react'
 import { ZapIcon } from '@primer/octicons-react'
-import { NavState, RepoIssue, RepoPR } from '@shared/types'
+import { NavState, RepoIssue, RepoPR, PTALItem } from '@shared/types'
 import { Sidebar } from './components/Sidebar'
 import { RecapPanel } from './components/RecapPanel'
 import { PTALPanel } from './components/PTALPanel'
@@ -24,6 +24,11 @@ export default function App() {
   const [repoData, setRepoData] = useState<Record<string, RepoData>>({})
   const [readState, setReadState] = useState<Record<string, string>>({})
   const [writeMode, setWriteMode] = useState(false)
+  const [ptalItems, setPtalItems] = useState<PTALItem[]>([])
+  const [ptalLoading, setPtalLoading] = useState(false)
+  const [ptalInitialized, setPtalInitialized] = useState(false)
+  // Keys cleared this session — prevents in-flight scans from resurrecting dismissed items
+  const ptalClearedKeysRef = useRef<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // Track the nav state to return to when closing a detail view
@@ -57,11 +62,37 @@ export default function App() {
         )
         setRepoData(Object.fromEntries(dataEntries))
 
-        // Kick off background recap generation so it's cached when the user opens the panel
-        const cachedRecap = await window.repoAssist.getRecapCache('__all__')
-        if (!cachedRecap) {
-          window.repoAssist.generateRecap(repoList).catch(() => {})
+        // Load PTAL cache for sidebar counts, then refresh in background
+        window.repoAssist.getPTALCache().then((cached: PTALItem[]) => {
+          if (cached.length > 0) {
+            setPtalItems(cached)
+            setPtalInitialized(true)
+          }
+        }).catch(() => {})
+        setPtalLoading(true)
+        window.repoAssist.scanPTAL(repoList).then((fresh: PTALItem[]) => {
+          setPtalItems(fresh.filter(i => !ptalClearedKeysRef.current.has(i.key)))
+          setPtalInitialized(true)
+          setPtalLoading(false)
+        }).catch(() => { setPtalLoading(false) })
+
+        // Kick off background recap generation so results are cached when the user opens panels.
+        // Generate global recap if not cached, then per-repo recaps sequentially in the background.
+        const generateInBackground = async () => {
+          try {
+            const cachedGlobal = await window.repoAssist.getRecapCache('__all__')
+            if (!cachedGlobal) {
+              await window.repoAssist.generateRecap(repoList)
+            }
+            for (const repo of repoList) {
+              const cachedRepo = await window.repoAssist.getRecapCache(repo)
+              if (!cachedRepo) {
+                await window.repoAssist.generateRecap([repo])
+              }
+            }
+          } catch { /* background — ignore errors */ }
         }
+        generateInBackground()
       } catch (err) {
         setError(`Failed to initialize: ${err}`)
         setLoading(false)
@@ -92,10 +123,43 @@ export default function App() {
     return items.filter(item => isUnread(repo, item.number, item.updatedAt)).length
   }, [isUnread])
 
+  const refreshPTAL = useCallback(async (repoList?: string[]) => {
+    const target = repoList ?? repos
+    setPtalLoading(true)
+    try {
+      const fresh = await window.repoAssist.scanPTAL(target)
+      setPtalItems(fresh.filter(i => !ptalClearedKeysRef.current.has(i.key)))
+      setPtalInitialized(true)
+    } catch { /* keep current items */ }
+    setPtalLoading(false)
+  }, [repos])
+
+  const handleClearPTAL = useCallback(async (item: PTALItem) => {
+    ptalClearedKeysRef.current.add(item.key)
+    await window.repoAssist.clearPTALItem(item.key, item.lastActivity.id)
+    setPtalItems(prev => prev.filter(i => i.key !== item.key))
+  }, [])
+
+  const handleRemoveRepo = useCallback(async (repo: string) => {
+    await window.repoAssist.removeRepo(repo)
+    setRepos(prev => prev.filter(r => r !== repo))
+    setRepoData(prev => {
+      const next = { ...prev }
+      delete next[repo]
+      return next
+    })
+    setPtalItems(prev => prev.filter(i => i.repo !== repo))
+    // Navigate away if viewing the removed repo
+    if (nav.repo === repo) {
+      setNav({ section: 'recap', repo: null, repoSection: null, selectedItem: null })
+    }
+  }, [nav.repo])
+
   const handleAddRepo = useCallback(async (repo: string) => {
     await window.repoAssist.addRepo(repo)
     if (!repos.includes(repo)) {
-      setRepos(prev => [...prev, repo])
+      const updatedRepos = [...repos, repo]
+      setRepos(updatedRepos)
       // Fetch data for the new repo
       try {
         const [issues, prs] = await Promise.all([
@@ -106,8 +170,10 @@ export default function App() {
       } catch {
         setRepoData(prev => ({ ...prev, [repo]: { issues: [], prs: [], loading: false } }))
       }
+      // Re-scan PTAL across all repos (including the new one)
+      refreshPTAL(updatedRepos)
     }
-  }, [repos])
+  }, [repos, refreshPTAL])
 
   /** Explicitly re-fetch issues & PRs for a repo (user-triggered refresh) */
   const handleRefreshRepo = useCallback(async (repo: string) => {
@@ -214,9 +280,9 @@ export default function App() {
           repoData={repoData}
           nav={nav}
           onNavigate={setNav}
-          isUnread={isUnread}
-          getUnreadCount={getUnreadCount}
+          ptalItems={ptalItems}
           onAddRepo={handleAddRepo}
+          onRemoveRepo={handleRemoveRepo}
           onRefreshRepo={handleRefreshRepo}
         />
 
@@ -225,10 +291,18 @@ export default function App() {
             <RecapPanel repos={repos} />
           )}
           {nav.section === 'ptal' && (
-            <PTALPanel repos={repos} onNavigate={(target) => {
-              returnNavRef.current = { ...nav }
-              setNav(target)
-            }} />
+            <PTALPanel
+              repos={repos}
+              items={ptalItems}
+              loading={ptalLoading}
+              initialized={ptalInitialized}
+              onClear={handleClearPTAL}
+              onRefresh={() => refreshPTAL()}
+              onNavigate={(target) => {
+                returnNavRef.current = { ...nav }
+                setNav(target)
+              }}
+            />
           )}
           {nav.section === 'commands' && (
             <CommandLog />
@@ -257,10 +331,19 @@ export default function App() {
             <RecapPanel repos={repos} filterRepo={nav.repo} />
           )}
           {nav.repo && nav.repoSection === 'repo-ptal' && (
-            <PTALPanel repos={repos} filterRepo={nav.repo} onNavigate={(target) => {
-              returnNavRef.current = { ...nav }
-              setNav(target)
-            }} />
+            <PTALPanel
+              repos={repos}
+              items={ptalItems}
+              loading={ptalLoading}
+              initialized={ptalInitialized}
+              filterRepo={nav.repo}
+              onClear={handleClearPTAL}
+              onRefresh={() => refreshPTAL()}
+              onNavigate={(target) => {
+                returnNavRef.current = { ...nav }
+                setNav(target)
+              }}
+            />
           )}
           {/* Detail view for selected issue or PR */}
           {nav.repo && nav.selectedItem && (nav.repoSection === 'issues' || nav.repoSection === 'prs') && (
