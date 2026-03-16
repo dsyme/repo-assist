@@ -190,6 +190,37 @@ export default function App() {
   }, [nav.repo])
 
   const handleAddRepo = useCallback(async (repo: string) => {
+    // Probe for existing repo-assist workflow
+    const hasWorkflow = await window.repoAssist.hasRepoAssistWorkflow(repo)
+
+    if (!hasWorkflow) {
+      const result = await window.repoAssist.showMessageBox({
+        message: `Repository ${repo} doesn't have a GitHub Agentic Workflow (repo-assist) installed.`,
+        detail: 'Would you like to open a terminal to install it using the gh-aw wizard?',
+        buttons: ['Yes', 'No', 'Cancel'],
+        defaultId: 0,
+        cancelId: 2,
+      })
+
+      if (result.response === 2) return // Cancel — don't add
+
+      if (result.response === 0) {
+        // Yes — ensure gh-aw extension, then open wizard terminal
+        const ensureResult = await window.repoAssist.ensureAwExtension()
+        if (!ensureResult.success) {
+          await window.repoAssist.showMessageBox({
+            type: 'warning',
+            message: 'Failed to install gh-aw extension',
+            detail: ensureResult.error || 'Unknown error. You can install it manually with: gh extension install github/gh-aw',
+            buttons: ['OK'],
+          })
+        } else {
+          await window.repoAssist.awAddWizard(repo)
+        }
+      }
+      // Yes or No: fall through to add the repo
+    }
+
     await window.repoAssist.addRepo(repo)
     if (!repos.includes(repo)) {
       const updatedRepos = [...repos, repo]
@@ -216,7 +247,7 @@ export default function App() {
     setPtalItems(prev => prev.filter(i => i.key !== key))
   }, [])
 
-  /** Explicitly re-fetch issues, PRs, and PTAL for a repo (user-triggered refresh) */
+  /** Explicitly re-fetch issues & PRs for a repo (user-triggered refresh) */
   const handleRefreshRepo = useCallback(async (repo: string) => {
     setRepoData(prev => ({ ...prev, [repo]: { ...prev[repo], loading: true } }))
     try {

@@ -1,6 +1,8 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, shell, dialog } from 'electron'
 import path from 'path'
-import { execSync } from 'child_process'
+import fs from 'fs'
+import os from 'os'
+import { execSync, spawn, execFileSync } from 'child_process'
 import { GhBridge } from './gh-bridge'
 import { LocalState } from './local-state'
 
@@ -53,6 +55,48 @@ function openExternalURL(url: string): void {
     } catch { /* fall through */ }
   }
   shell.openExternal(url)
+}
+
+/** Find an available terminal emulator on the system */
+function findTerminal(): string | null {
+  for (const term of ['x-terminal-emulator', 'xterm', 'gnome-terminal']) {
+    try {
+      execFileSync('which', [term], { stdio: 'pipe' })
+      return term
+    } catch { /* not found */ }
+  }
+  return null
+}
+
+/** Open a command in a new interactive terminal window */
+function openInteractiveShell(command: string): void {
+  const scriptPath = path.join(os.tmpdir(), `ra-shell-${Date.now()}.sh`)
+  fs.writeFileSync(scriptPath, `#!/bin/bash\n${command}\necho\nread -p 'Press Enter to close...'\n`, { mode: 0o755 })
+
+  if (isWSL()) {
+    const distro = process.env.WSL_DISTRO_NAME
+    const wslArgs = distro ? ['wsl', '-d', distro, 'bash', scriptPath] : ['wsl', 'bash', scriptPath]
+    const child = spawn('wt.exe', ['-d', '.', '--', ...wslArgs], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.on('error', () => {
+      spawn('cmd.exe', ['/c', 'start', '', ...wslArgs], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref()
+    })
+    child.unref()
+    return
+  }
+
+  const term = findTerminal()
+  if (!term) return
+  if (term === 'gnome-terminal') {
+    spawn(term, ['--', 'bash', scriptPath], { detached: true, stdio: 'ignore' }).unref()
+  } else {
+    spawn(term, ['-e', 'bash', scriptPath], { detached: true, stdio: 'ignore' }).unref()
+  }
 }
 
 function createWindow(): void {
@@ -405,4 +449,52 @@ ipcHandle('ptal:clear', async (key: unknown, activityId: unknown) => {
 
 ipcHandle('ptal:getCleared', async () => {
   return localState.getPTALCleared()
+})
+
+// gh-aw handlers
+ipcMain.handle('gh:checkAwExtension', async () => {
+  return ghBridge.checkAwExtension()
+})
+
+ipcMain.handle('gh:ensureAwExtension', async () => {
+  return ghBridge.ensureAwExtension()
+})
+
+ipcMain.handle('gh:hasRepoAssistWorkflow', async (_event, repo: string) => {
+  return ghBridge.hasRepoAssistWorkflow(repo)
+})
+
+ipcMain.handle('gh:awAddWizard', async (_event, repo: string) => {
+  if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) return
+  const salt = Date.now().toString(6)
+  const repoDir = `/tmp/${repo.replace('/', '-')}-${salt}`
+  const cmds = [
+    `gh repo clone ${repo} ${repoDir}`,
+    `cd ${repoDir}`,
+    `gh aw add-wizard githubnext/agentics/repo-assist`,
+    `cd /tmp`,
+    `rm -rf ${repoDir}`,
+  ].join(' && ')
+  openInteractiveShell(cmds)
+})
+
+ipcMain.handle('gh:awRun', async (_event, repo: string, specPath: string, repeat?: number) => {
+  if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repo)) return
+  if (!/^\.github\/workflows\/[a-zA-Z0-9_.-]+\.md$/.test(specPath)) return
+  const cmd = repeat && repeat > 1
+    ? `gh aw run ${specPath} --repo ${repo} --repeat ${repeat}`
+    : `gh aw run ${specPath} --repo ${repo}`
+  openInteractiveShell(cmd)
+})
+
+ipcMain.handle('app:showMessageBox', async (_event, options: { type?: string; message: string; detail?: string; buttons: string[]; defaultId?: number; cancelId?: number }) => {
+  if (!mainWindow) return { response: options.cancelId ?? 2 }
+  return dialog.showMessageBox(mainWindow, {
+    type: (options.type as 'question' | 'info' | 'warning' | 'error') || 'question',
+    message: options.message,
+    detail: options.detail,
+    buttons: options.buttons,
+    defaultId: options.defaultId,
+    cancelId: options.cancelId,
+  })
 })

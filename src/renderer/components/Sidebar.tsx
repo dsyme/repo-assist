@@ -12,6 +12,7 @@ import {
   EyeIcon,
   SparkleIcon,
   SyncIcon,
+  TrashIcon,
 } from '@primer/octicons-react'
 import { NavState, RepoIssue, RepoPR, PTALItem } from '@shared/types'
 
@@ -28,8 +29,8 @@ interface SidebarProps {
   onNavigate: (nav: NavState) => void
   ptalItems: PTALItem[]
   onAddRepo?: (repo: string) => void
-  onRemoveRepo?: (repo: string) => void
   onRefreshRepo?: (repo: string) => void
+  onRemoveRepo?: (repo: string) => void
 }
 
 export function Sidebar({ repos, repoData, nav, onNavigate, ptalItems, onAddRepo, onRemoveRepo, onRefreshRepo }: SidebarProps) {
@@ -196,7 +197,7 @@ export function Sidebar({ repos, repoData, nav, onNavigate, ptalItems, onAddRepo
                 {onRemoveRepo && (
                   <span
                     className="sidebar-remove-btn"
-                    title="Remove repository"
+                    title="Remove repo"
                     onClick={(e) => { e.stopPropagation(); onRemoveRepo(repo) }}
                   >
                     <XIcon size={14} />

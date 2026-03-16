@@ -224,6 +224,23 @@ export function AutomationsList({ repo }: AutomationsListProps) {
     }
   }, [repo])
 
+  const handlePlayRun = useCallback(async (e: React.MouseEvent, wf: EnrichedWorkflow, repeat?: number) => {
+    e.stopPropagation()
+    const ensureResult = await window.repoAssist.ensureAwExtension()
+    if (!ensureResult.success) {
+      await window.repoAssist.showMessageBox({
+        type: 'warning',
+        message: 'Failed to install gh-aw extension',
+        detail: ensureResult.error || 'Install manually: gh extension install github/gh-aw',
+        buttons: ['OK'],
+      })
+      return
+    }
+    if (wf.specPath) {
+      await window.repoAssist.awRun(repo, wf.specPath, repeat)
+    }
+  }, [repo])
+
   const openInGitHub = (wf: EnrichedWorkflow) => {
     const path = wf.specPath || wf.path
     window.repoAssist.openExternal(`https://github.com/${repo}/blob/main/${path}`)
@@ -308,27 +325,40 @@ export function AutomationsList({ repo }: AutomationsListProps) {
                   {group.map(wf => {
                     const wfRuns = runsByWorkflow.get(wf.name) || []
                     const runCount = wfRuns.length
+                    const showPlay = wf.kind === 'ghaw' && wf.specPath
                     return (
-                      <ActionList.Item key={wf.id} onSelect={() => handleSelectWorkflow(wf)}>
-                        <ActionList.LeadingVisual>
-                          <WorkflowKindIcon kind={wf.kind} />
-                        </ActionList.LeadingVisual>
-                        <div>
-                          <Text weight="semibold">{wf.name}</Text>
-                          <div className="run-meta">
-                            <Label variant={wf.kind === 'ghaw' ? 'accent' : 'secondary'}>
-                              {kindLabel(wf.kind)}
-                            </Label>
-                            <Label variant={wf.state === 'active' ? 'success' : 'secondary'}>
-                              {wf.state}
-                            </Label>
-                            {runCount > 0 && (
-                              <CounterLabel>{runCount} in {runsTimeSpan(wfRuns)}</CounterLabel>
-                            )}
-                            {runsLoading && <Spinner size="small" />}
+                      <div key={wf.id} className={showPlay ? 'aw-item-wrapper' : undefined}>
+                        <ActionList.Item onSelect={() => handleSelectWorkflow(wf)}>
+                          <ActionList.LeadingVisual>
+                            <WorkflowKindIcon kind={wf.kind} />
+                          </ActionList.LeadingVisual>
+                          <div>
+                            <Text weight="semibold">{wf.name}</Text>
+                            <div className="run-meta">
+                              <Label variant={wf.kind === 'ghaw' ? 'accent' : 'secondary'}>
+                                {kindLabel(wf.kind)}
+                              </Label>
+                              <Label variant={wf.state === 'active' ? 'success' : 'secondary'}>
+                                {wf.state}
+                              </Label>
+                              {runCount > 0 && (
+                                <CounterLabel>{runCount} in {runsTimeSpan(wfRuns)}</CounterLabel>
+                              )}
+                              {runsLoading && <Spinner size="small" />}
+                            </div>
                           </div>
-                        </div>
-                      </ActionList.Item>
+                        </ActionList.Item>
+                        {showPlay && (
+                          <div className="aw-play-buttons">
+                            <Button size="small" variant="invisible" onClick={(e) => handlePlayRun(e, wf)}>
+                              <PlayIcon size={14} /> Play
+                            </Button>
+                            <Button size="small" variant="invisible" onClick={(e) => handlePlayRun(e, wf, 10)}>
+                              <PlayIcon size={14} /> Play (10)
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>

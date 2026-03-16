@@ -480,6 +480,42 @@ export class GhBridge {
     }
   }
 
+  /** Check if the gh-aw extension is installed */
+  async checkAwExtension(): Promise<boolean> {
+    try {
+      const { stdout } = await execFileAsync('gh', ['extension', 'list'], { timeout: 10000 })
+      return stdout.includes('gh-aw')
+    } catch {
+      return false
+    }
+  }
+
+  /** Install or upgrade the gh-aw extension */
+  async ensureAwExtension(): Promise<{ success: boolean; error?: string }> {
+    const installed = await this.checkAwExtension()
+    if (installed) {
+      try {
+        await execFileAsync('gh', ['extension', 'upgrade', 'gh-aw'], { timeout: 60000 })
+      } catch { /* ignore upgrade failures */ }
+      return { success: true }
+    }
+    try {
+      await execFileAsync('gh', ['extension', 'install', 'github/gh-aw'], { timeout: 60000 })
+      return { success: true }
+    } catch (err: unknown) {
+      const error = err as { stderr?: string }
+      return { success: false, error: error.stderr || String(err) }
+    }
+  }
+
+  /** Check if repo has repo-assist workflow files */
+  async hasRepoAssistWorkflow(repo: string): Promise<boolean> {
+    const md = await this.getFileContent(repo, '.github/workflows/repo-assist.md')
+    if (md !== null) return true
+    const lock = await this.getFileContent(repo, '.github/workflows/repo-assist.lock.yml')
+    return lock !== null
+  }
+
   // === AI Model ===
 
   /** Run an AI model via `gh models run`. Returns output text or throws. */

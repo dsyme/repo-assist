@@ -171,6 +171,12 @@ export interface RepoAssistAPI {
   exec: (command: string) => Promise<unknown>
   checkModelsExtension: () => Promise<boolean>
   installModelsExtension: () => Promise<{ success: boolean; error?: string }>
+  checkAwExtension: () => Promise<boolean>
+  ensureAwExtension: () => Promise<{ success: boolean; error?: string }>
+  hasRepoAssistWorkflow: (repo: string) => Promise<boolean>
+  awAddWizard: (repo: string) => Promise<void>
+  awRun: (repo: string, specPath: string, repeat?: number) => Promise<void>
+  showMessageBox: (options: { type?: string; message: string; detail?: string; buttons: string[]; defaultId?: number; cancelId?: number }) => Promise<{ response: number }>
   getWriteMode: () => Promise<boolean>
   setWriteMode: (enabled: boolean) => Promise<void>
   addComment: (repo: string, number: number, body: string) => Promise<unknown>

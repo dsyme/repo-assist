@@ -29,6 +29,12 @@ contextBridge.exposeInMainWorld('repoAssist', {
   exec: (command: string) => ipcRenderer.invoke('gh:exec', command),
   checkModelsExtension: () => ipcRenderer.invoke('gh:checkModelsExtension'),
   installModelsExtension: () => ipcRenderer.invoke('gh:installModelsExtension'),
+  checkAwExtension: () => ipcRenderer.invoke('gh:checkAwExtension'),
+  ensureAwExtension: () => ipcRenderer.invoke('gh:ensureAwExtension'),
+  hasRepoAssistWorkflow: (repo: string) => ipcRenderer.invoke('gh:hasRepoAssistWorkflow', repo),
+  awAddWizard: (repo: string) => ipcRenderer.invoke('gh:awAddWizard', repo),
+  awRun: (repo: string, specPath: string, repeat?: number) => ipcRenderer.invoke('gh:awRun', repo, specPath, repeat),
+  showMessageBox: (options: { type?: string; message: string; detail?: string; buttons: string[]; defaultId?: number; cancelId?: number }) => ipcRenderer.invoke('app:showMessageBox', options),
 
   // Write operations
   getWriteMode: () => ipcRenderer.invoke('gh:writeMode'),
