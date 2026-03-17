@@ -512,7 +512,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
           <div key={i} className="detail-comment">
             <div className="detail-comment-header">
               <span className="comment-avatar">
-                {(c.author?.login ?? '?')[0].toUpperCase()}
+                {(c.author?.login || '?')[0].toUpperCase()}
               </span>
               <Text weight="semibold" size="small">
                 <AuthorDisplay
@@ -745,7 +745,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
               <div key={i} className="detail-comment">
                 <div className="detail-comment-header">
                   <span className="comment-avatar">
-                    {(r.author?.login ?? '?')[0].toUpperCase()}
+                    {(r.author?.login || '?')[0].toUpperCase()}
                   </span>
                   <Text weight="semibold" size="small">{r.author?.login ?? 'unknown'}</Text>
                   <Label size="small" variant={r.state === 'APPROVED' ? 'success' : r.state === 'CHANGES_REQUESTED' ? 'danger' : 'secondary'}>
