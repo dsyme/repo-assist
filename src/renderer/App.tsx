@@ -468,6 +468,36 @@ export default function App() {
                     setNav(prev => ({ ...prev, selectedItem: null }))
                   }
                 }}
+                onIssueClosed={() => {
+                  const closedRepo = nav.repo!
+                  const closedNumber = nav.selectedItem!
+                  removePTALForPR(closedRepo, closedNumber)
+                  // Remove from the open issues list
+                  setRepoData(prev => {
+                    const data = prev[closedRepo]
+                    if (!data) return prev
+                    return { ...prev, [closedRepo]: { ...data, issues: data.issues.filter(i => i.number !== closedNumber) } }
+                  })
+                }}
+                onMerged={() => {
+                  const mergedRepo = nav.repo!
+                  const mergedNumber = nav.selectedItem!
+                  // Close the detail panel
+                  if (returnNavRef.current) {
+                    setNav(returnNavRef.current)
+                    returnNavRef.current = null
+                  } else {
+                    setNav(prev => ({ ...prev, selectedItem: null }))
+                  }
+                  // Remove the PR from the open PRs list
+                  setRepoData(prev => {
+                    const data = prev[mergedRepo]
+                    if (!data) return prev
+                    return { ...prev, [mergedRepo]: { ...data, prs: data.prs.filter(pr => pr.number !== mergedNumber) } }
+                  })
+                  // Remove from PTAL items
+                  removePTALForPR(mergedRepo, mergedNumber)
+                }}
               />
             </ErrorBoundary>
           )}

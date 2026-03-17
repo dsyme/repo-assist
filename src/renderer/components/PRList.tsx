@@ -36,6 +36,18 @@ export function PRList({ repo, prs, writeMode, onSelectItem, onRefresh, onPRStat
   // Cached branch status per PR number
   const [branchStatus, setBranchStatus] = useState<Record<number, PRBranchStatus>>({})
   const branchStatusFetched = useRef<Set<string>>(new Set())
+  // Cached repo permission for merge bypass
+  const [repoPermission, setRepoPermission] = useState<string | null>(null)
+  const permissionFetched = useRef(false)
+
+  // Fetch repo permission once
+  useEffect(() => {
+    if (permissionFetched.current) return
+    permissionFetched.current = true
+    window.repoAssist.getRepoPermission(repo).then(perm => {
+      setRepoPermission(perm)
+    }).catch(() => {})
+  }, [repo])
 
   // Asynchronously fetch branch status for each PR (cached per repo+number)
   useEffect(() => {
@@ -228,19 +240,39 @@ export function PRList({ repo, prs, writeMode, onSelectItem, onRefresh, onPRStat
                         }
                       </button>
                     )}
-                    {!pr.isDraft && open && (
-                      <button
-                        className="pr-action-btn pr-action-success"
-                        title="Merge PR"
-                        onClick={(e) => handleMergePR(e, pr.number)}
-                        disabled={mergingPR === pr.number}
-                      >
-                        {mergingPR === pr.number
-                          ? <Spinner size="small" />
-                          : <><GitMergeIcon size={14} /> <span className="pr-action-label">Merge</span></>
-                        }
-                      </button>
-                    )}
+                    {!pr.isDraft && open && (() => {
+                      const isConflicting = pr.mergeable === 'CONFLICTING'
+                      const isDirty = pr.mergeStateStatus === 'DIRTY'
+                      const isBlocked = pr.mergeStateStatus === 'BLOCKED'
+                      const canBypass = repoPermission === 'admin' || repoPermission === 'maintain'
+                      if (isConflicting || isDirty) {
+                        return (
+                          <span className="pr-action-btn pr-action-muted" title="Has merge conflicts">
+                            <AlertIcon size={14} /> <span className="pr-action-label">Conflicts</span>
+                          </span>
+                        )
+                      }
+                      if (isBlocked && !canBypass) {
+                        return (
+                          <span className="pr-action-btn pr-action-muted" title="Merging is blocked">
+                            <AlertIcon size={14} /> <span className="pr-action-label">Blocked</span>
+                          </span>
+                        )
+                      }
+                      return (
+                        <button
+                          className={isBlocked ? 'pr-action-btn pr-action-danger' : 'pr-action-btn pr-action-success'}
+                          title={isBlocked ? 'Merge (bypass rules)' : 'Merge PR'}
+                          onClick={(e) => handleMergePR(e, pr.number)}
+                          disabled={mergingPR === pr.number}
+                        >
+                          {mergingPR === pr.number
+                            ? <Spinner size="small" />
+                            : <><GitMergeIcon size={14} /> <span className="pr-action-label">{isBlocked ? 'Merge (bypass)' : 'Merge'}</span></>
+                          }
+                        </button>
+                      )
+                    })()}
                     {open && (
                       <button
                         className="pr-action-btn pr-action-danger"

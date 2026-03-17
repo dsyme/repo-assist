@@ -19,6 +19,8 @@ export interface RepoPR {
   author: { login: string }
   labels: { name: string; color: string }[]
   reviewDecision: string
+  mergeable: string
+  mergeStateStatus: string
   statusCheckRollup: { status: string; conclusion: string; name: string }[]
   createdAt: string
   updatedAt: string
@@ -104,6 +106,8 @@ export interface PRDetail {
   files: { path: string; additions: number; deletions: number }[]
   comments: { author: { login: string }; body: string; createdAt: string }[]
   reviews: { author: { login: string }; body: string; state: string; createdAt: string }[]
+  mergeable: string
+  mergeStateStatus: string
   statusCheckRollup: PRCheck[]
   commits: PRCommit[]
   createdAt: string
@@ -161,6 +165,8 @@ export interface RepoAssistAPI {
   updatePRBranch: (repo: string, number: number) => Promise<unknown>
   getFileContent: (repo: string, path: string) => Promise<string | null>
   closeIssue: (repo: string, number: number, reason: string) => Promise<unknown>
+  applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => Promise<void>
+  getRepoPermission: (repo: string) => Promise<string>
   searchRepos: (query: string) => Promise<{ fullName: string; description: string }[]>
   getRecentRepos: () => Promise<{ fullName: string; description: string }[]>
   addRepo: (repo: string) => Promise<string[]>

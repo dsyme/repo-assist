@@ -159,7 +159,7 @@ export class GhBridge {
 
   async getPRs(repo: string): Promise<unknown[]> {
     const result = await this.exec(
-      `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,statusCheckRollup,createdAt,updatedAt,labels,headRefName,baseRefName --limit 50 --state open`
+      `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,createdAt,updatedAt,labels,headRefName,baseRefName --limit 50 --state open`
     )
     if (result.exitCode !== 0) return []
     try {
@@ -201,7 +201,7 @@ export class GhBridge {
 
   async getPRDetail(repo: string, number: number): Promise<unknown | null> {
     const result = await this.exec(
-      `pr view ${number} -R ${repo} --json number,title,body,comments,reviews,files,additions,deletions,statusCheckRollup,state,isDraft,reviewDecision,labels,author,createdAt,updatedAt,headRefName,commits`
+      `pr view ${number} -R ${repo} --json number,title,body,comments,reviews,files,additions,deletions,statusCheckRollup,state,isDraft,reviewDecision,mergeable,mergeStateStatus,labels,author,createdAt,updatedAt,headRefName,commits`
     )
     if (result.exitCode !== 0) return null
     try {
@@ -457,6 +457,15 @@ export class GhBridge {
       return { stdout: '[DRY RUN] PR would be merged', stderr: '', exitCode: 0, command: `gh ${command}`, durationMs: 0 }
     }
     return this.exec(`pr merge ${number} -R ${repo} --squash`, 'write')
+  }
+
+  /** Get the authenticated user's permission level for a repo (admin, write, read, none) */
+  async getRepoPermission(repo: string): Promise<string> {
+    const result = await this.exec(
+      `api repos/${repo} --jq '.permissions | if .admin then "admin" elif .maintain then "maintain" elif .push then "write" elif .triage then "triage" elif .pull then "read" else "none" end'`
+    )
+    if (result.exitCode !== 0) return 'unknown'
+    return result.stdout.trim() || 'unknown'
   }
 
   /** Check if the gh-models extension is installed */

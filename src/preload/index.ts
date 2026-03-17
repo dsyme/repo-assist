@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('repoAssist', {
   getWorkflows: (repo: string) => ipcRenderer.invoke('gh:getWorkflows', repo),
   getFileContent: (repo: string, path: string) => ipcRenderer.invoke('gh:getFileContent', repo, path),
   closeIssue: (repo: string, number: number, reason: string) => ipcRenderer.invoke('gh:closeIssue', repo, number, reason),
+  applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => ipcRenderer.invoke('gh:applyPatchPR', issueRepo, targetRepo, commands),
+  getRepoPermission: (repo: string) => ipcRenderer.invoke('gh:getRepoPermission', repo),
   searchRepos: (query: string) => ipcRenderer.invoke('gh:searchRepos', query),
   getRecentRepos: () => ipcRenderer.invoke('gh:getRecentRepos'),
   addRepo: (repo: string) => ipcRenderer.invoke('app:addRepo', repo),

@@ -283,6 +283,69 @@ ipcHandle('gh:closeIssue', async (repo: unknown, number: unknown, reason: unknow
   return ghBridge.closeIssue(repo as string, number as number, reason as string, writeMode)
 })
 
+ipcHandle('gh:getRepoPermission', async (repo: unknown) => {
+  return ghBridge.getRepoPermission(repo as string)
+})
+
+ipcMain.handle('gh:applyPatchPR', async (_event, issueRepo: string, targetRepo: string, commands: string[]) => {
+  log('info', `applyPatchPR called: issueRepo=${issueRepo}, targetRepo=${targetRepo}, commands=${JSON.stringify(commands)}`)
+
+  // Validate repo formats
+  const repoPattern = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/
+  if (!repoPattern.test(issueRepo) || !repoPattern.test(targetRepo)) {
+    log('warn', `applyPatchPR: repo format validation failed — issueRepo="${issueRepo}", targetRepo="${targetRepo}"`)
+    return
+  }
+  if (!Array.isArray(commands) || commands.length === 0) {
+    log('warn', 'applyPatchPR: commands is empty or not an array')
+    return
+  }
+
+  // Validate each command is a known safe pattern
+  for (const cmd of commands) {
+    const stripped = cmd.replace(/'[^']*'/g, 'Q').replace(/"[^"]*"/g, 'Q')
+    if (/[`$;|&<>\\(){}\n\r]/.test(stripped)) {
+      const badChar = stripped.match(/[`$;|&<>\\(){}\n\r]/)
+      log('warn', `applyPatchPR: unsafe char "${badChar?.[0]}" in command after quote-stripping: "${stripped}"`)
+      return
+    }
+    if (
+      !cmd.startsWith('gh run download ') &&
+      !cmd.startsWith('git checkout -b ') &&
+      !cmd.startsWith('git am ') &&
+      !cmd.startsWith('git push origin ') &&
+      !cmd.startsWith('gh pr create ')
+    ) {
+      log('warn', `applyPatchPR: unrecognized command prefix: "${cmd.substring(0, 60)}"`)
+      return
+    }
+  }
+
+  const salt = Date.now().toString(36)
+  const repoDir = `/tmp/${targetRepo.replace('/', '-')}-patch-${salt}`
+
+  // Separate commands by phase
+  const preClone = commands
+    .filter(c => c.startsWith('gh run download '))
+    .map(c => c.includes(' -R ') ? c : `${c} -R ${issueRepo}`)
+  const gitCommands = commands.filter(c => c.startsWith('git '))
+  const prCreate = commands.filter(c => c.startsWith('gh pr create '))
+
+  const script = [
+    ...preClone,
+    `gh repo clone ${targetRepo} ${repoDir}`,
+    `cd ${repoDir}`,
+    ...gitCommands,
+    ...prCreate,
+    `echo "Done! Cleaning up temp clone..."`,
+    `cd /tmp`,
+    `rm -rf ${repoDir}`,
+  ].join(' && ')
+
+  log('info', `applyPatchPR: launching interactive shell with script:\n${script}`)
+  openInteractiveShell(script)
+})
+
 ipcHandle('gh:getPRChecks', async (repo: unknown, number: unknown) => {
   return ghBridge.getPRChecks(repo as string, number as number)
 })
