@@ -348,8 +348,7 @@ export default function App() {
       <div className="toolbar">
         <div className="toolbar-left">
           <span className="toolbar-brand">
-            <ZapIcon size={16} />
-            Repo Assist
+            🌈 Repo Assist
           </span>
           <span className="toolbar-meta">{repos.length} repositories</span>
         </div>

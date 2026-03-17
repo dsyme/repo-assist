@@ -445,8 +445,8 @@ export class GhBridge {
   }
 
   async mergePR(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `pr merge ${number} -R ${repo}`
     if (!writeMode) {
-      const command = `pr merge ${number} -R ${repo} --squash`
       this.addToLog({
         command: `gh ${command}`,
         startedAt: new Date().toISOString(),
@@ -456,7 +456,16 @@ export class GhBridge {
       })
       return { stdout: '[DRY RUN] PR would be merged', stderr: '', exitCode: 0, command: `gh ${command}`, durationMs: 0 }
     }
-    return this.exec(`pr merge ${number} -R ${repo} --squash`, 'write')
+    // Try merge without specifying strategy — gh will use the repo's default allowed method
+    // If that fails (interactive prompt), try each strategy explicitly
+    let result = await this.exec(command, 'write')
+    if (result.exitCode !== 0) {
+      for (const strategy of ['--merge', '--squash', '--rebase']) {
+        result = await this.exec(`pr merge ${number} -R ${repo} ${strategy}`, 'write')
+        if (result.exitCode === 0) break
+      }
+    }
+    return result
   }
 
   /** Get the authenticated user's permission level for a repo (admin, write, read, none) */

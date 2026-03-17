@@ -848,7 +848,6 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
             const isDirty = mss === 'DIRTY'
             const isBlocked = mss === 'BLOCKED'
             const canBypass = repoPermission === 'admin' || repoPermission === 'maintain'
-            const canMerge = !isConflicting && !isDirty && (!isBlocked || canBypass)
 
             if (isConflicting || isDirty) return null  // Can't merge, conflicts
             if (isBlocked && !canBypass) return null    // Blocked with no bypass

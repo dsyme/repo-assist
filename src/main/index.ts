@@ -111,7 +111,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: 'Repo Assist',
+    title: '🌈 Repo Assist',
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -280,7 +280,11 @@ ipcHandle('gh:getFileContent', async (repo: unknown, filePath: unknown) => {
 
 ipcHandle('gh:closeIssue', async (repo: unknown, number: unknown, reason: unknown) => {
   const writeMode = localState.getWriteMode()
-  return ghBridge.closeIssue(repo as string, number as number, reason as string, writeMode)
+  const result = await ghBridge.closeIssue(repo as string, number as number, reason as string, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Close failed (exit code ${result.exitCode})`)
+  }
+  return result
 })
 
 ipcHandle('gh:getRepoPermission', async (repo: unknown) => {
@@ -356,7 +360,11 @@ ipcHandle('gh:getPRTimeline', async (repo: unknown, number: unknown) => {
 
 ipcHandle('gh:markPRReady', async (repo: unknown, number: unknown) => {
   const writeMode = localState.getWriteMode()
-  return ghBridge.markPRReady(repo as string, number as number, writeMode)
+  const result = await ghBridge.markPRReady(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Mark ready failed (exit code ${result.exitCode})`)
+  }
+  return result
 })
 
 ipcHandle('gh:getPRBranchStatus', async (repo: unknown, number: unknown) => {
@@ -365,7 +373,11 @@ ipcHandle('gh:getPRBranchStatus', async (repo: unknown, number: unknown) => {
 
 ipcHandle('gh:updatePRBranch', async (repo: unknown, number: unknown) => {
   const writeMode = localState.getWriteMode()
-  return ghBridge.updatePRBranch(repo as string, number as number, writeMode)
+  const result = await ghBridge.updatePRBranch(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Update branch failed (exit code ${result.exitCode})`)
+  }
+  return result
 })
 
 ipcHandle('gh:searchRepos', async (query: unknown) => {
@@ -447,17 +459,29 @@ ipcHandle('gh:setWriteMode', async (enabled: unknown) => {
 
 ipcHandle('gh:addComment', async (repo: unknown, number: unknown, body: unknown) => {
   const writeMode = localState.getWriteMode()
-  return ghBridge.addComment(repo as string, number as number, body as string, writeMode)
+  const result = await ghBridge.addComment(repo as string, number as number, body as string, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Comment failed (exit code ${result.exitCode})`)
+  }
+  return result
 })
 
 ipcHandle('gh:mergePR', async (repo: unknown, number: unknown) => {
   const writeMode = localState.getWriteMode()
-  return ghBridge.mergePR(repo as string, number as number, writeMode)
+  const result = await ghBridge.mergePR(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Merge failed (exit code ${result.exitCode})`)
+  }
+  return result
 })
 
 ipcHandle('gh:approvePR', async (repo: unknown, number: unknown) => {
   const writeMode = localState.getWriteMode()
-  return ghBridge.approvePR(repo as string, number as number, writeMode)
+  const result = await ghBridge.approvePR(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Approve failed (exit code ${result.exitCode})`)
+  }
+  return result
 })
 
 // Local state
