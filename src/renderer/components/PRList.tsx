@@ -20,12 +20,13 @@ interface PRListProps {
   repo: string
   prs: RepoPR[]
   writeMode: boolean
+  loading?: boolean
   onSelectItem: (number: number) => void
   onRefresh: () => void
   onPRStateChange?: (prNumber: number) => void
 }
 
-export function PRList({ repo, prs, writeMode, onSelectItem, onRefresh, onPRStateChange }: PRListProps) {
+export function PRList({ repo, prs, writeMode, loading, onSelectItem, onRefresh, onPRStateChange }: PRListProps) {
   const [markingReady, setMarkingReady] = useState<number | null>(null)
   const [updatingBranch, setUpdatingBranch] = useState<number | null>(null)
   const [approvingPR, setApprovingPR] = useState<number | null>(null)
@@ -39,6 +40,17 @@ export function PRList({ repo, prs, writeMode, onSelectItem, onRefresh, onPRStat
   // Cached repo permission for merge bypass
   const [repoPermission, setRepoPermission] = useState<string | null>(null)
   const permissionFetched = useRef(false)
+
+  // Clear optimistic overrides and branch cache when fresh data arrives
+  const prevPrsRef = useRef(prs)
+  useEffect(() => {
+    if (prs !== prevPrsRef.current) {
+      prevPrsRef.current = prs
+      setLocalOverrides({})
+      branchStatusFetched.current = new Set()
+      setBranchStatus({})
+    }
+  }, [prs])
 
   // Fetch repo permission once
   useEffect(() => {
@@ -103,6 +115,12 @@ export function PRList({ repo, prs, writeMode, onSelectItem, onRefresh, onPRStat
     try {
       await window.repoAssist.updatePRBranch(repo, prNumber)
       setBranchStatus(prev => ({ ...prev, [prNumber]: { behindBy: 0, status: 'up_to_date' } }))
+    } catch {
+      // Re-fetch actual status on failure — stale data may have been wrong
+      try {
+        const status = await window.repoAssist.getPRBranchStatus(repo, prNumber)
+        setBranchStatus(prev => ({ ...prev, [prNumber]: status }))
+      } catch { /* ignore */ }
     } finally {
       setUpdatingBranch(null)
     }
@@ -157,11 +175,12 @@ export function PRList({ repo, prs, writeMode, onSelectItem, onRefresh, onPRStat
           </span>
         </div>
         <Button
-          leadingVisual={SyncIcon}
+          leadingVisual={loading ? undefined : SyncIcon}
           onClick={onRefresh}
           size="small"
+          disabled={loading}
         >
-          Refresh
+          {loading ? <><Spinner size="small" /> Refreshing…</> : 'Refresh'}
         </Button>
       </div>
 

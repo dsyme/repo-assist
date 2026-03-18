@@ -266,9 +266,9 @@ export class GhBridge {
     if (prResult.exitCode !== 0) return { behindBy: 0, status: 'unknown' }
     try {
       const pr = JSON.parse(prResult.stdout) as { headRefName: string; baseRefName: string }
-      // Compare base...head to find how far behind the PR is
+      // Compare base...head to find how far behind the PR branch is
       const compareResult = await this.exec(
-        `api repos/${repo}/compare/${pr.headRefName}...${pr.baseRefName} --jq .behind_by`
+        `api repos/${repo}/compare/${pr.baseRefName}...${pr.headRefName} --jq .behind_by`
       )
       if (compareResult.exitCode !== 0) return { behindBy: 0, status: 'unknown' }
       const behindBy = parseInt(compareResult.stdout.trim(), 10)

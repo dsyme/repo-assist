@@ -192,10 +192,10 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
   const [error, setError] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
   const [actionStatus, setActionStatus] = useState<string | null>(null)
+  const [busyAction, setBusyAction] = useState<string | null>(null)
   const [visibleComments, setVisibleComments] = useState(INITIAL_COMMENT_COUNT)
   const [ciChecks, setCiChecks] = useState<PRCheck[]>([])
   const [timeline, setTimeline] = useState<PRTimelineEvent[]>([])
-  const [closing, setClosing] = useState(false)
   const [branchStatus, setBranchStatus] = useState<PRBranchStatus | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -290,6 +290,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return
+    setBusyAction('comment')
     setActionStatus('Adding comment…')
     try {
       await window.repoAssist.addComment(repo, number, commentText)
@@ -305,6 +306,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
     }
+    setBusyAction(null)
     setTimeout(() => setActionStatus(null), 3000)
   }
 
@@ -333,36 +335,50 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
   }
 
   const handleMergePR = async (bypass: boolean = false) => {
+    setBusyAction('merge')
     setActionStatus('Merging PR…')
     try {
       await window.repoAssist.mergePR(repo, number, bypass)
       if (writeMode) {
         setActionStatus('PR merged!')
+        setBusyAction(null)
         setTimeout(() => onMerged?.(), 800)
       } else {
         setActionStatus('Merge logged (dry-run, read-only mode)')
+        setBusyAction(null)
         setTimeout(() => setActionStatus(null), 3000)
       }
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
+      setBusyAction(null)
       setTimeout(() => setActionStatus(null), 3000)
     }
   }
 
   const handleClosePR = async () => {
+    setBusyAction('close-pr')
     setActionStatus('Closing PR…')
     try {
       await window.repoAssist.exec(`pr close ${number} -R ${repo}`)
-      setActionStatus(writeMode ? 'PR closed!' : 'Close logged (dry-run, read-only mode)')
+      if (writeMode) {
+        setActionStatus('PR closed!')
+        setBusyAction(null)
+        setTimeout(() => onMerged?.(), 800)
+      } else {
+        setActionStatus('Close logged (dry-run, read-only mode)')
+        setBusyAction(null)
+        setTimeout(() => setActionStatus(null), 3000)
+      }
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
+      setBusyAction(null)
+      setTimeout(() => setActionStatus(null), 3000)
     }
-    setTimeout(() => setActionStatus(null), 3000)
   }
 
   const handleCloseIssue = async (reason: 'completed' | 'not_planned') => {
     const reasonLabel = reason === 'not_planned' ? 'not planned' : 'completed'
-    setClosing(true)
+    setBusyAction(reason === 'not_planned' ? 'close-not-planned' : 'close-completed')
 
     // Optimistic UI: update state and add a synthetic close event
     if (issueDetail) {
@@ -375,7 +391,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
 
       if (!writeMode) {
         setActionStatus('Close logged (dry-run, read-only mode)')
-        setClosing(false)
+        setBusyAction(null)
         setTimeout(() => setActionStatus(null), 3000)
         return
       }
@@ -410,13 +426,14 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
       if (issueDetail) {
         setIssueDetail(prev => prev ? { ...prev, state: 'OPEN' } : prev)
       }
-      setClosing(false)
+      setBusyAction(null)
       setActionStatus(`Failed: ${err}`)
       setTimeout(() => setActionStatus(null), 3000)
     }
   }
 
   const handleMarkReady = async () => {
+    setBusyAction('mark-ready')
     setActionStatus('Marking as ready for review…')
     try {
       await window.repoAssist.markPRReady(repo, number)
@@ -427,10 +444,12 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
     }
+    setBusyAction(null)
     setTimeout(() => setActionStatus(null), 3000)
   }
 
   const handleUpdateBranch = async () => {
+    setBusyAction('update-branch')
     setActionStatus('Updating branch…')
     try {
       await window.repoAssist.updatePRBranch(repo, number)
@@ -439,11 +458,18 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
       setBranchStatus({ behindBy: 0, status: 'up_to_date' })
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
+      // Re-fetch actual status — stale data may have been wrong
+      try {
+        const status = await window.repoAssist.getPRBranchStatus(repo, number)
+        setBranchStatus(status)
+      } catch { /* ignore */ }
     }
+    setBusyAction(null)
     setTimeout(() => setActionStatus(null), 3000)
   }
 
   const handleApprovePR = async () => {
+    setBusyAction('approve')
     setActionStatus('Approving PR…')
     try {
       await window.repoAssist.approvePR(repo, number)
@@ -454,6 +480,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
     } catch (err) {
       setActionStatus(`Failed: ${err}`)
     }
+    setBusyAction(null)
     setTimeout(() => setActionStatus(null), 3000)
   }
 
@@ -593,11 +620,11 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
         <div className="detail-actions">
           {issueDetail.state !== 'CLOSED' && issueDetail.state !== 'closed' && (
             <>
-              <Button size="small" variant="primary" onClick={() => handleCloseIssue('completed')} disabled={closing}>
-                {writeMode ? 'Close (completed)' : 'Close (completed, dry-run)'}
+              <Button size="small" variant="primary" onClick={() => handleCloseIssue('completed')} disabled={!!busyAction}>
+                {busyAction === 'close-completed' ? <><Spinner size="small" /> Closing…</> : (writeMode ? 'Close (completed)' : 'Close (completed, dry-run)')}
               </Button>
-              <Button size="small" variant="danger" onClick={() => handleCloseIssue('not_planned')} disabled={closing}>
-                {writeMode ? 'Close (not planned)' : 'Close (not planned, dry-run)'}
+              <Button size="small" variant="danger" onClick={() => handleCloseIssue('not_planned')} disabled={!!busyAction}>
+                {busyAction === 'close-not-planned' ? <><Spinner size="small" /> Closing…</> : (writeMode ? 'Close (not planned)' : 'Close (not planned, dry-run)')}
               </Button>
             </>
           )}
@@ -620,8 +647,8 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
             onChange={e => setCommentText(e.target.value)}
             rows={3}
           />
-          <Button size="small" variant="primary" onClick={handleAddComment} disabled={!commentText.trim()}>
-            Comment{!writeMode && ' (dry-run)'}
+          <Button size="small" variant="primary" onClick={handleAddComment} disabled={!commentText.trim() || !!busyAction}>
+            {busyAction === 'comment' ? <><Spinner size="small" /> Commenting…</> : <>Comment{!writeMode && ' (dry-run)'}</>}
           </Button>
         </div>
 
@@ -772,8 +799,8 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
           <Flash variant="warning" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertIcon size={16} />
             <span>Branch is {branchStatus.behindBy} commit{branchStatus.behindBy !== 1 ? 's' : ''} behind {prDetail.headRefName ? 'the base branch' : 'base'}</span>
-            <Button size="small" leadingVisual={SyncIcon} onClick={handleUpdateBranch} style={{ marginLeft: 'auto' }}>
-              {writeMode ? 'Update branch' : 'Update branch (dry-run)'}
+            <Button size="small" leadingVisual={busyAction === 'update-branch' ? undefined : SyncIcon} onClick={handleUpdateBranch} disabled={!!busyAction} style={{ marginLeft: 'auto' }}>
+              {busyAction === 'update-branch' ? <><Spinner size="small" /> Updating…</> : (writeMode ? 'Update branch' : 'Update branch (dry-run)')}
             </Button>
           </Flash>
         )}
@@ -832,13 +859,13 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
         {/* Actions */}
         <div className="detail-actions">
           {prDetail.isDraft && (
-            <Button size="small" variant="primary" onClick={handleMarkReady}>
-              {writeMode ? 'Ready for review' : 'Ready for review (dry-run)'}
+            <Button size="small" variant="primary" onClick={handleMarkReady} disabled={!!busyAction}>
+              {busyAction === 'mark-ready' ? <><Spinner size="small" /> Marking ready…</> : (writeMode ? 'Ready for review' : 'Ready for review (dry-run)')}
             </Button>
           )}
           {!prDetail.isDraft && prDetail.state !== 'MERGED' && prDetail.state !== 'CLOSED' && prDetail.reviewDecision !== 'APPROVED' && (
-            <Button size="small" leadingVisual={CheckIcon} onClick={handleApprovePR}>
-              {writeMode ? 'Approve PR' : 'Approve PR (dry-run)'}
+            <Button size="small" leadingVisual={busyAction === 'approve' ? undefined : CheckIcon} onClick={handleApprovePR} disabled={!!busyAction}>
+              {busyAction === 'approve' ? <><Spinner size="small" /> Approving…</> : (writeMode ? 'Approve PR' : 'Approve PR (dry-run)')}
             </Button>
           )}
           {!prDetail.isDraft && prDetail.state !== 'MERGED' && prDetail.state !== 'CLOSED' && (() => {
@@ -857,16 +884,19 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
                 size="small"
                 variant={isBlocked ? 'danger' : 'primary'}
                 onClick={() => handleMergePR(isBlocked)}
+                disabled={!!busyAction}
               >
-                {isBlocked
-                  ? (writeMode ? 'Merge (bypass rules)' : 'Merge (bypass rules, dry-run)')
-                  : (writeMode ? 'Merge PR' : 'Merge PR (dry-run)')
+                {busyAction === 'merge'
+                  ? <><Spinner size="small" /> Merging…</>
+                  : isBlocked
+                    ? (writeMode ? 'Merge (bypass rules)' : 'Merge (bypass rules, dry-run)')
+                    : (writeMode ? 'Merge PR' : 'Merge PR (dry-run)')
                 }
               </Button>
             )
           })()}
-          <Button size="small" variant="danger" onClick={handleClosePR}>
-            {writeMode ? 'Close PR' : 'Close PR (dry-run)'}
+          <Button size="small" variant="danger" onClick={handleClosePR} disabled={!!busyAction}>
+            {busyAction === 'close-pr' ? <><Spinner size="small" /> Closing…</> : (writeMode ? 'Close PR' : 'Close PR (dry-run)')}
           </Button>
           <Button size="small" leadingVisual={LinkExternalIcon} onClick={openInGitHub}>
             Open in GitHub
@@ -882,8 +912,8 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
             onChange={e => setCommentText(e.target.value)}
             rows={3}
           />
-          <Button size="small" variant="primary" onClick={handleAddComment} disabled={!commentText.trim()}>
-            Comment{!writeMode && ' (dry-run)'}
+          <Button size="small" variant="primary" onClick={handleAddComment} disabled={!commentText.trim() || !!busyAction}>
+            {busyAction === 'comment' ? <><Spinner size="small" /> Commenting…</> : <>Comment{!writeMode && ' (dry-run)'}</>}
           </Button>
         </div>
 

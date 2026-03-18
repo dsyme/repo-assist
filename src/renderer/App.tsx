@@ -425,6 +425,7 @@ export default function App() {
               repo={nav.repo}
               prs={repoData[nav.repo].prs}
               writeMode={writeMode}
+              loading={repoData[nav.repo].loading}
               onSelectItem={(num: number) => setNav(prev => ({ ...prev, selectedItem: num }))}
               onRefresh={() => handleRefreshRepo(nav.repo!)}
               onPRStateChange={(prNumber: number) => removePTALForPR(nav.repo!, prNumber)}
