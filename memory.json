@@ -1,6 +1,6 @@
 {
-  "last_run": "2026-04-03T05:51:10Z",
-  "run_id": "23935671833",
+  "last_run": "2026-04-04T05:37:00Z",
+  "run_id": "23972377449",
   "comments_made": {},
   "issues_commented": [],
   "fix_attempts": [],
@@ -8,25 +8,32 @@
     {
       "branch": "repo-assist/eng-fix-tsconfig-baseurl-deprecation-2026-04-02-5cd18fdcf57f68a2",
       "title": "[Repo Assist] fix(tsconfig): remove deprecated baseUrl option",
-      "status": "patch_only",
-      "created": "2026-04-02",
-      "note": "Permissions gap — patch pushed but real PR not created. User must enable Actions PR permissions."
+      "status": "pr_created",
+      "created": "2026-04-04",
+      "note": "PR created successfully this run"
     },
     {
-      "branch": "repo-assist/improve-shared-sanitize-html",
+      "branch": "repo-assist/improve-shared-sanitize-html-406cc9fea7113f81",
       "title": "[Repo Assist] refactor(renderer): extract shared sanitizeHtml utility",
-      "status": "patch_only",
-      "created": "2026-04-02",
-      "note": "Permissions gap — patch pushed but real PR not created."
+      "status": "pr_created",
+      "created": "2026-04-04",
+      "note": "PR created successfully this run"
     },
     {
-      "branch": "repo-assist/improve-gh-bridge-dry-run-and-ext-cache",
+      "branch": "repo-assist/improve-gh-bridge-dry-run-and-ext-cache-84403523eb2acab9",
       "title": "[Repo Assist] refactor(gh-bridge): extract dry-run helper and cache extension list",
-      "status": "patch_only",
-      "created": "2026-04-03",
-      "note": "Permissions gap — patch pushed but real PR not created."
+      "status": "pr_created",
+      "created": "2026-04-04",
+      "note": "PR created successfully this run"
+    },
+    {
+      "branch": "repo-assist/eng-bundle-minor-updates-2026-04-04",
+      "title": "[Repo Assist] chore(deps): bundle minor/patch dependency updates",
+      "status": "pr_created",
+      "created": "2026-04-04",
+      "note": "PR created this run - updates @primer/* 19.22→19.23, 11.5→11.6, 38.15→38.18, electron 41.0→41.1, marked 17.0.4→17.0.5, styled-components 6.3.11→6.3.12, vitest 4.1.0→4.1.2"
     }
   ],
   "monthly_activity_issue": 5,
-  "notes": "All PRs are patches only due to Actions permissions gap. Three improvement patches pending. Monthly Activity issue #5 updated."
+  "notes": "All 4 PRs created successfully. Major version bumps (vite 8, typescript 6, @vitejs/plugin-react 6) identified but excluded - warrant separate assessment."
 }
