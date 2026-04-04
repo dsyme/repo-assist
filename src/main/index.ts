@@ -278,6 +278,24 @@ ipcHandle('gh:getWorkflows', async (repo: unknown) => {
   return ghBridge.getWorkflows(repo as string)
 })
 
+ipcHandle('gh:enableWorkflow', async (repo: unknown, workflowId: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.enableWorkflow(repo as string, workflowId as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Enable workflow failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
+ipcHandle('gh:disableWorkflow', async (repo: unknown, workflowId: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.disableWorkflow(repo as string, workflowId as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Disable workflow failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
 ipcHandle('gh:getFileContent', async (repo: unknown, filePath: unknown) => {
   return ghBridge.getFileContent(repo as string, filePath as string)
 })
@@ -293,6 +311,10 @@ ipcHandle('gh:closeIssue', async (repo: unknown, number: unknown, reason: unknow
 
 ipcHandle('gh:getRepoPermission', async (repo: unknown) => {
   return ghBridge.getRepoPermission(repo as string)
+})
+
+ipcHandle('gh:getViewerLogin', async () => {
+  return ghBridge.getUsername()
 })
 
 ipcMain.handle('gh:applyPatchPR', async (_event, issueRepo: string, targetRepo: string, commands: string[]) => {

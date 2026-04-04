@@ -434,7 +434,7 @@ export default function App() {
             />
           )}
           {nav.repo && nav.repoSection === 'automations' && (
-            <AutomationsList repo={nav.repo} />
+            <AutomationsList repo={nav.repo} writeMode={writeMode} />
           )}
           {nav.repo && nav.repoSection === 'repo-recap' && (
             <RecapPanel repos={repos} filterRepo={nav.repo} />

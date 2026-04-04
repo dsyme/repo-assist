@@ -160,7 +160,7 @@ export class GhBridge {
 
   async getPRs(repo: string): Promise<unknown[]> {
     const result = await this.exec(
-      `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,createdAt,updatedAt,labels,headRefName,baseRefName --limit 50 --state open`
+      `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,latestReviews,createdAt,updatedAt,labels,headRefName,baseRefName --limit 50 --state open`
     )
     if (result.exitCode !== 0) return []
     try {
@@ -316,6 +316,16 @@ export class GhBridge {
     } catch {
       return []
     }
+  }
+
+  async enableWorkflow(repo: string, workflowId: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `workflow enable ${workflowId} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Workflow would be enabled')
+  }
+
+  async disableWorkflow(repo: string, workflowId: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `workflow disable ${workflowId} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Workflow would be disabled')
   }
 
   async getFileContent(repo: string, path: string): Promise<string | null> {

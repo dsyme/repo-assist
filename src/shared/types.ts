@@ -22,6 +22,7 @@ export interface RepoPR {
   mergeable: string
   mergeStateStatus: string
   statusCheckRollup: { status: string; conclusion: string; name: string }[]
+  latestReviews?: { author: { login: string }; state: string }[]
   createdAt: string
   updatedAt: string
   headRefName: string
@@ -155,6 +156,8 @@ export interface RepoAssistAPI {
   getPRs: (repo: string) => Promise<RepoPR[]>
   getRuns: (repo: string) => Promise<RepoRun[]>
   getWorkflows: (repo: string) => Promise<RepoWorkflow[]>
+  enableWorkflow: (repo: string, workflowId: number) => Promise<unknown>
+  disableWorkflow: (repo: string, workflowId: number) => Promise<unknown>
   getIssueDetail: (repo: string, number: number) => Promise<IssueDetail | null>
   getPRDetail: (repo: string, number: number) => Promise<PRDetail | null>
   getPRDiff: (repo: string, number: number) => Promise<string>
@@ -167,6 +170,7 @@ export interface RepoAssistAPI {
   closeIssue: (repo: string, number: number, reason: string) => Promise<unknown>
   applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => Promise<void>
   getRepoPermission: (repo: string) => Promise<string>
+  getViewerLogin: () => Promise<string>
   searchRepos: (query: string) => Promise<{ fullName: string; description: string }[]>
   getRecentRepos: () => Promise<{ fullName: string; description: string }[]>
   addRepo: (repo: string) => Promise<string[]>

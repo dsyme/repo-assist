@@ -17,8 +17,10 @@ import { RepoPR, PRBranchStatus } from '@shared/types'
 // --- Shared hook: manages branch status, permissions, overrides, and action handlers ---
 
 export interface PRListActionsState {
+  repo: string
   branchStatus: Record<number, PRBranchStatus>
   repoPermission: string | null
+  viewerLogin: string | null
   localOverrides: Record<number, Partial<RepoPR>>
   markingReady: number | null
   updatingBranch: number | null
@@ -47,6 +49,8 @@ export function usePRListActions(
   const branchStatusFetched = useRef<Set<string>>(new Set())
   const [repoPermission, setRepoPermission] = useState<string | null>(null)
   const permissionFetched = useRef(false)
+  const [viewerLogin, setViewerLogin] = useState<string | null>(null)
+  const viewerLoginFetched = useRef(false)
 
   // Clear optimistic overrides and branch cache when fresh data arrives
   const prevPrsRef = useRef(prs)
@@ -67,6 +71,15 @@ export function usePRListActions(
       setRepoPermission(perm)
     }).catch(() => {})
   }, [repo])
+
+  // Fetch viewer login once
+  useEffect(() => {
+    if (viewerLoginFetched.current) return
+    viewerLoginFetched.current = true
+    window.repoAssist.getViewerLogin().then(login => {
+      setViewerLogin(login)
+    }).catch(() => {})
+  }, [])
 
   // Asynchronously fetch branch status for each PR
   useEffect(() => {
@@ -143,7 +156,7 @@ export function usePRListActions(
   }, [repo, onPRStateChange])
 
   return {
-    branchStatus, repoPermission, localOverrides,
+    repo, branchStatus, repoPermission, viewerLogin, localOverrides,
     markingReady, updatingBranch, approvingPR, mergingPR, closingPR,
     handleMarkReady, handleUpdateBranch, handleApprovePR, handleMergePR, handleClosePR,
   }
@@ -175,7 +188,7 @@ interface PRItemRowProps {
 
 export function PRItemRow({ pr, actions, onSelect }: PRItemRowProps) {
   const {
-    branchStatus, repoPermission,
+    repo, branchStatus, repoPermission, viewerLogin,
     markingReady, updatingBranch, approvingPR, mergingPR, closingPR,
     handleMarkReady, handleUpdateBranch, handleApprovePR, handleMergePR, handleClosePR,
   } = actions
@@ -185,6 +198,9 @@ export function PRItemRow({ pr, actions, onSelect }: PRItemRowProps) {
   const bs = branchStatus[pr.number]
   const behind = bs?.status === 'behind'
   const behindCount = bs?.behindBy ?? 0
+  const viewerHasApproved = viewerLogin
+    ? pr.latestReviews?.some(r => r.author?.login === viewerLogin && r.state === 'APPROVED') ?? false
+    : false
 
   return (
     <ActionList.Item onSelect={onSelect}>
@@ -241,7 +257,7 @@ export function PRItemRow({ pr, actions, onSelect }: PRItemRowProps) {
                 }
               </button>
             )}
-            {!pr.isDraft && open && pr.reviewDecision !== 'APPROVED' && (
+            {!pr.isDraft && open && !viewerHasApproved && pr.reviewDecision !== 'APPROVED' && pr.author?.login !== viewerLogin && (
               <button
                 className="pr-action-btn pr-action-success"
                 title="Approve PR"
@@ -261,9 +277,13 @@ export function PRItemRow({ pr, actions, onSelect }: PRItemRowProps) {
               const canBypass = repoPermission === 'admin' || repoPermission === 'maintain'
               if (isConflicting || isDirty) {
                 return (
-                  <span className="pr-action-btn pr-action-muted" title="Has merge conflicts">
+                  <button
+                    className="pr-action-btn pr-action-muted"
+                    title="Has merge conflicts — click to resolve on GitHub"
+                    onClick={(e) => { e.stopPropagation(); window.repoAssist.openExternal(`https://github.com/${repo}/pull/${pr.number}/conflicts`) }}
+                  >
                     <AlertIcon size={14} /> <span className="pr-action-label">Conflicts</span>
-                  </span>
+                  </button>
                 )
               }
               if (isBlocked && !canBypass) {

@@ -15,6 +15,7 @@ import {
   ZapIcon,
   MarkGithubIcon,
   SyncIcon,
+  StopIcon,
 } from '@primer/octicons-react'
 import { marked } from 'marked'
 import { RepoWorkflow, RepoRun } from '@shared/types'
@@ -24,6 +25,7 @@ marked.setOptions({ gfm: true, breaks: true })
 
 interface AutomationsListProps {
   repo: string
+  writeMode: boolean
 }
 
 /** Enriched workflow with agentic detection and resolved spec path */
@@ -119,7 +121,7 @@ function RunStatusIcon({ status, conclusion }: { status: string; conclusion: str
   return <ClockIcon size={14} />
 }
 
-export function AutomationsList({ repo }: AutomationsListProps) {
+export function AutomationsList({ repo, writeMode }: AutomationsListProps) {
   const [workflows, setWorkflows] = useState<EnrichedWorkflow[]>([])
   const [loading, setLoading] = useState(true)
   const [runs, setRuns] = useState<RepoRun[]>([])
@@ -128,6 +130,7 @@ export function AutomationsList({ repo }: AutomationsListProps) {
   const [sourceContent, setSourceContent] = useState<string | null>(null)
   const [sourceLoading, setSourceLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [togglingWorkflow, setTogglingWorkflow] = useState<number | null>(null)
 
   // Load workflows
   useEffect(() => {
@@ -216,6 +219,26 @@ export function AutomationsList({ repo }: AutomationsListProps) {
       setSourceLoading(false)
     }
   }, [repo])
+
+  const handleToggleWorkflow = useCallback(async (e: React.MouseEvent, wf: EnrichedWorkflow) => {
+    e.stopPropagation()
+    setTogglingWorkflow(wf.id)
+    try {
+      const isActive = wf.state === 'active'
+      if (isActive) {
+        await window.repoAssist.disableWorkflow(repo, wf.id)
+      } else {
+        await window.repoAssist.enableWorkflow(repo, wf.id)
+      }
+      if (writeMode) {
+        setWorkflows(prev => prev.map(w =>
+          w.id === wf.id ? { ...w, state: isActive ? 'disabled_manually' : 'active' } : w
+        ))
+      }
+    } catch { /* ignore */ } finally {
+      setTogglingWorkflow(null)
+    }
+  }, [repo, writeMode])
 
   const handlePlayRun = useCallback(async (e: React.MouseEvent, wf: EnrichedWorkflow, repeat?: number) => {
     e.stopPropagation()
@@ -319,8 +342,12 @@ export function AutomationsList({ repo }: AutomationsListProps) {
                     const wfRuns = runsByWorkflow.get(wf.name) || []
                     const runCount = wfRuns.length
                     const showPlay = wf.kind === 'ghaw' && wf.specPath
+                    const canToggle = !wf.path.startsWith('dynamic/') &&
+                      (wf.state === 'active' || wf.state === 'disabled_manually' || wf.state === 'disabled_inactivity')
+                    const isActive = wf.state === 'active'
+                    const showButtons = showPlay || canToggle
                     return (
-                      <div key={wf.id} className={showPlay ? 'aw-item-wrapper' : undefined}>
+                      <div key={wf.id} className={showButtons ? 'aw-item-wrapper' : undefined}>
                         <ActionList.Item onSelect={() => handleSelectWorkflow(wf)}>
                           <ActionList.LeadingVisual>
                             <WorkflowKindIcon kind={wf.kind} />
@@ -341,14 +368,33 @@ export function AutomationsList({ repo }: AutomationsListProps) {
                             </div>
                           </div>
                         </ActionList.Item>
-                        {showPlay && (
+                        {showButtons && (
                           <div className="aw-play-buttons">
-                            <Button size="small" variant="invisible" onClick={(e) => handlePlayRun(e, wf)}>
-                              <PlayIcon size={14} /> Play
-                            </Button>
-                            <Button size="small" variant="invisible" onClick={(e) => handlePlayRun(e, wf, 10)}>
-                              <PlayIcon size={14} /> Play (10)
-                            </Button>
+                            {showPlay && (
+                              <>
+                                <Button size="small" variant="invisible" onClick={(e) => handlePlayRun(e, wf)}>
+                                  <PlayIcon size={14} /> Play
+                                </Button>
+                                <Button size="small" variant="invisible" onClick={(e) => handlePlayRun(e, wf, 10)}>
+                                  <PlayIcon size={14} /> Play (10)
+                                </Button>
+                              </>
+                            )}
+                            {canToggle && (
+                              <Button
+                                size="small"
+                                variant="invisible"
+                                onClick={(e) => handleToggleWorkflow(e, wf)}
+                                disabled={togglingWorkflow === wf.id}
+                              >
+                                {togglingWorkflow === wf.id
+                                  ? <Spinner size="small" />
+                                  : isActive
+                                    ? <><StopIcon size={14} /> {writeMode ? 'Disable' : 'Disable (dry-run)'}</>
+                                    : <><PlayIcon size={14} /> {writeMode ? 'Enable' : 'Enable (dry-run)'}</>
+                                }
+                              </Button>
+                            )}
                           </div>
                         )}
                       </div>

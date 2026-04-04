@@ -192,6 +192,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [repoPermission, setRepoPermission] = useState<string | null>(null)
+  const [viewerLogin, setViewerLogin] = useState<string | null>(null)
 
   // Detect patch application instructions in issue body
   const patchInstructions = useMemo(
@@ -239,6 +240,10 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
           // Fetch repo permission for merge bypass check
           window.repoAssist.getRepoPermission(repo).then(perm => {
             setRepoPermission(perm)
+          }).catch(() => {})
+          // Fetch viewer login for approve guard
+          window.repoAssist.getViewerLogin().then(login => {
+            setViewerLogin(login)
           }).catch(() => {})
         }
       } catch (err) {
@@ -786,8 +791,8 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
           <CIChecksPanel checks={ciChecks} openExternal={window.repoAssist.openExternal} />
         )}
 
-        {/* Branch status — behind base */}
-        {branchStatus?.status === 'behind' && (
+        {/* Branch status — behind base (hidden when there are merge conflicts) */}
+        {branchStatus?.status === 'behind' && prDetail.mergeable !== 'CONFLICTING' && prDetail.mergeStateStatus !== 'DIRTY' && (
           <Flash variant="warning" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertIcon size={16} />
             <span>Branch is {branchStatus.behindBy} commit{branchStatus.behindBy !== 1 ? 's' : ''} behind {prDetail.headRefName ? 'the base branch' : 'base'}</span>
@@ -811,8 +816,17 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
 
           if (isConflicting || isDirty) {
             return (
-              <Flash variant="danger" style={{ marginTop: 8 }}>
-                <AlertIcon size={16} /> This branch has merge conflicts that must be resolved before merging.
+              <Flash variant="danger" style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertIcon size={16} />
+                <span>This branch has merge conflicts that must be resolved before merging.</span>
+                <Button
+                  size="small"
+                  variant="danger"
+                  onClick={() => window.repoAssist.openExternal(`https://github.com/${repo}/pull/${number}/conflicts`)}
+                  style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
+                >
+                  Resolve conflicts
+                </Button>
               </Flash>
             )
           }
@@ -855,7 +869,9 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
               {busyAction === 'mark-ready' ? <><Spinner size="small" /> Marking ready…</> : (writeMode ? 'Ready for review' : 'Ready for review (dry-run)')}
             </Button>
           )}
-          {!prDetail.isDraft && prDetail.state !== 'MERGED' && prDetail.state !== 'CLOSED' && prDetail.reviewDecision !== 'APPROVED' && (
+          {!prDetail.isDraft && prDetail.state !== 'MERGED' && prDetail.state !== 'CLOSED' && prDetail.reviewDecision !== 'APPROVED' &&
+            !(viewerLogin && prDetail.reviews?.some(r => r.author?.login === viewerLogin && r.state === 'APPROVED')) &&
+            prDetail.author?.login !== viewerLogin && (
             <Button size="small" leadingVisual={busyAction === 'approve' ? undefined : CheckIcon} onClick={handleApprovePR} disabled={!!busyAction}>
               {busyAction === 'approve' ? <><Spinner size="small" /> Approving…</> : (writeMode ? 'Approve PR' : 'Approve PR (dry-run)')}
             </Button>
