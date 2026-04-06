@@ -346,6 +346,11 @@ export class GhBridge {
     return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Issue would be closed')
   }
 
+  async reopenIssue(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `issue reopen ${number} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Issue would be reopened')
+  }
+
   async searchRepos(query: string): Promise<unknown[]> {
     const result = await this.exec(
       `search repos "${query}" --json fullName,description,updatedAt --limit 10`
