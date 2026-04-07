@@ -200,6 +200,18 @@ describe('GhBridge', () => {
       expect(result.stdout).toContain('DRY RUN')
       expect(result.exitCode).toBe(0)
     })
+
+    it('cancelRun returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.cancelRun('owner/repo', 12345, false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
+    })
+
+    it('rerunFailedJobs returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.rerunFailedJobs('owner/repo', 12345, false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
+    })
   })
 
   describe('getIssues', () => {
