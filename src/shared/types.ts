@@ -168,6 +168,9 @@ export interface RepoAssistAPI {
   updatePRBranch: (repo: string, number: number) => Promise<unknown>
   getFileContent: (repo: string, path: string) => Promise<string | null>
   closeIssue: (repo: string, number: number, reason: string) => Promise<unknown>
+  getRepoLabels: (repo: string) => Promise<{ name: string; color: string }[]>
+  addLabel: (repo: string, number: number, type: 'issue' | 'pr', label: string) => Promise<unknown>
+  removeLabel: (repo: string, number: number, type: 'issue' | 'pr', label: string) => Promise<unknown>
   applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => Promise<void>
   getRepoPermission: (repo: string) => Promise<string>
   getViewerLogin: () => Promise<string>

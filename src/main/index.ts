@@ -309,6 +309,28 @@ ipcHandle('gh:closeIssue', async (repo: unknown, number: unknown, reason: unknow
   return result
 })
 
+ipcHandle('gh:getRepoLabels', async (repo: unknown) => {
+  return ghBridge.getRepoLabels(repo as string)
+})
+
+ipcHandle('gh:addLabel', async (repo: unknown, number: unknown, type: unknown, label: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.addLabel(repo as string, number as number, type as 'issue' | 'pr', label as string, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Add label failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
+ipcHandle('gh:removeLabel', async (repo: unknown, number: unknown, type: unknown, label: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.removeLabel(repo as string, number as number, type as 'issue' | 'pr', label as string, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Remove label failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
 ipcHandle('gh:getRepoPermission', async (repo: unknown) => {
   return ghBridge.getRepoPermission(repo as string)
 })

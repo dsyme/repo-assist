@@ -200,6 +200,18 @@ describe('GhBridge', () => {
       expect(result.stdout).toContain('DRY RUN')
       expect(result.exitCode).toBe(0)
     })
+
+    it('addLabel returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.addLabel('owner/repo', 42, 'issue', 'bug', false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
+    })
+
+    it('removeLabel returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.removeLabel('owner/repo', 42, 'pr', 'enhancement', false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
+    })
   })
 
   describe('getIssues', () => {
@@ -222,6 +234,23 @@ describe('GhBridge', () => {
       mockExecFileAsync.mockResolvedValue({ stdout: 'not json', stderr: '' })
 
       const result = await bridge.getIssues('owner/repo')
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('getRepoLabels', () => {
+    it('returns parsed label array on success', async () => {
+      const labels = [{ name: 'bug', color: 'd73a4a' }, { name: 'enhancement', color: 'a2eeef' }]
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(labels), stderr: '' })
+
+      const result = await bridge.getRepoLabels('owner/repo')
+      expect(result).toEqual(labels)
+    })
+
+    it('returns empty array on failure', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('fail'), { code: 1, stderr: 'err', stdout: '' }))
+
+      const result = await bridge.getRepoLabels('owner/repo')
       expect(result).toEqual([])
     })
   })

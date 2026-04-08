@@ -346,6 +346,26 @@ export class GhBridge {
     return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Issue would be closed')
   }
 
+  async getRepoLabels(repo: string): Promise<{ name: string; color: string }[]> {
+    try {
+      const result = await this.exec(`label list -R ${repo} --json name,color --limit 100`)
+      if (result.exitCode !== 0 || !result.stdout) return []
+      return JSON.parse(result.stdout)
+    } catch {
+      return []
+    }
+  }
+
+  async addLabel(repo: string, number: number, type: 'issue' | 'pr', label: string, writeMode: boolean): Promise<GhExecResult> {
+    const command = `${type} edit ${number} -R ${repo} --add-label "${label}"`
+    return this.execWriteOrDryRun(command, writeMode, `[DRY RUN] Label '${label}' would be added`)
+  }
+
+  async removeLabel(repo: string, number: number, type: 'issue' | 'pr', label: string, writeMode: boolean): Promise<GhExecResult> {
+    const command = `${type} edit ${number} -R ${repo} --remove-label "${label}"`
+    return this.execWriteOrDryRun(command, writeMode, `[DRY RUN] Label '${label}' would be removed`)
+  }
+
   async searchRepos(query: string): Promise<unknown[]> {
     const result = await this.exec(
       `search repos "${query}" --json fullName,description,updatedAt --limit 10`
