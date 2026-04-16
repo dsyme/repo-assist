@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 7683787..ff66013 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -30,5 +30,8 @@ jobs:
+       - name: Type check
+         run: npm run typecheck
+ 
++      - name: Test
++        run: npm test
++
+       - name: Build
+         run: npm run build

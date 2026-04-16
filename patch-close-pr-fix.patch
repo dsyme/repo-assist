@@ -1,0 +1,160 @@
+diff --git a/src/main/gh-bridge.test.ts b/src/main/gh-bridge.test.ts
+index 9f4c05c..dd0a90d 100644
+--- a/src/main/gh-bridge.test.ts
++++ b/src/main/gh-bridge.test.ts
+@@ -195,6 +195,23 @@ describe('GhBridge', () => {
+       expect(result.exitCode).toBe(0)
+     })
+ 
++    it('addComment passes body as a separate arg to avoid quoting issues', async () => {
++      mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
++      await bridge.addComment('owner/repo', 1, 'body with "double quotes"', true)
++      expect(mockExecFileAsync).toHaveBeenCalledWith(
++        'gh',
++        ['issue', 'comment', '1', '-R', 'owner/repo', '--body', 'body with "double quotes"'],
++        expect.anything()
++      )
++    })
++
++    it('closePR returns dry-run result when writeMode is false', async () => {
++      const result = await bridge.closePR('owner/repo', 1, false)
++      expect(result.stdout).toContain('DRY RUN')
++      expect(result.exitCode).toBe(0)
++      expect(mockExecFileAsync).not.toHaveBeenCalled()
++    })
++
+     it('mergePR returns dry-run result when writeMode is false', async () => {
+       const result = await bridge.mergePR('owner/repo', 1, false)
+       expect(result.stdout).toContain('DRY RUN')
+diff --git a/src/main/gh-bridge.ts b/src/main/gh-bridge.ts
+index a814a9d..14e3132 100644
+--- a/src/main/gh-bridge.ts
++++ b/src/main/gh-bridge.ts
+@@ -401,10 +401,16 @@ export class GhBridge {
+ 
+   async addComment(repo: string, number: number, body: string, writeMode: boolean): Promise<GhExecResult> {
+     if (!writeMode) {
+-      const command = `issue comment ${number} -R ${repo} --body "${body.substring(0, 50)}..."`
+-      return this.execWriteOrDryRun(command, false, '[DRY RUN] Comment would be added')
++      return this.execWriteOrDryRun(`issue comment ${number} -R ${repo}`, false, '[DRY RUN] Comment would be added')
+     }
+-    return this.exec(`issue comment ${number} -R ${repo} --body "${body}"`, 'write')
++    // Use execWithArgs to pass body as a proper argument — avoids parseGhArgs
++    // mishandling quote characters inside the comment body.
++    return this.execWithArgs(['issue', 'comment', String(number), '-R', repo, '--body', body], 'write')
++  }
++
++  async closePR(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
++    const command = `pr close ${number} -R ${repo}`
++    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] PR would be closed')
+   }
+ 
+   async mergePR(repo: string, number: number, writeMode: boolean, bypass: boolean = false): Promise<GhExecResult> {
+@@ -731,6 +737,37 @@ ${sections.join('\n\n')}`
+     }
+   }
+ 
++  /** Like exec() but accepts a pre-split args array, bypassing parseGhArgs.
++   *  Use this for commands where user-supplied content (e.g. comment body) is passed
++   *  as an argument value to avoid quoting issues in the string-based parser. */
++  private async execWithArgs(args: string[], mode: 'read' | 'write' | 'dry-run' = 'read'): Promise<GhExecResult> {
++    const command = `gh ${args.map(a => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`
++    const startedAt = new Date().toISOString()
++    const start = Date.now()
++    try {
++      const { stdout, stderr } = await execFileAsync('gh', args, {
++        timeout: 30000,
++        maxBuffer: 10 * 1024 * 1024,
++      })
++      const durationMs = Date.now() - start
++      const entry: CommandLogEntry = { command, startedAt, durationMs, exitCode: 0, mode }
++      this.addToLog(entry)
++      return { stdout, stderr, exitCode: 0, command, durationMs }
++    } catch (err: unknown) {
++      const durationMs = Date.now() - start
++      const error = err as { stdout?: string; stderr?: string; code?: number }
++      const entry: CommandLogEntry = { command, startedAt, durationMs, exitCode: error.code ?? 1, mode, stderr: error.stderr }
++      this.addToLog(entry)
++      return {
++        stdout: error.stdout ?? '',
++        stderr: error.stderr ?? String(err),
++        exitCode: error.code ?? 1,
++        command,
++        durationMs,
++      }
++    }
++  }
++
+   /** Execute a write command or log it as a dry-run when writeMode is false. */
+   private execWriteOrDryRun(command: string, writeMode: boolean, dryRunMessage: string): Promise<GhExecResult> {
+     if (!writeMode) {
+diff --git a/src/main/index.ts b/src/main/index.ts
+index 81eeaa0..7bb284b 100644
+--- a/src/main/index.ts
++++ b/src/main/index.ts
+@@ -511,6 +511,15 @@ ipcHandle('gh:mergePR', async (repo: unknown, number: unknown, bypass: unknown)
+   return result
+ })
+ 
++ipcHandle('gh:closePR', async (repo: unknown, number: unknown) => {
++  const writeMode = localState.getWriteMode()
++  const result = await ghBridge.closePR(repo as string, number as number, writeMode)
++  if (result.exitCode !== 0) {
++    throw new Error(result.stderr || `Close PR failed (exit code ${result.exitCode})`)
++  }
++  return result
++})
++
+ ipcHandle('gh:approvePR', async (repo: unknown, number: unknown) => {
+   const writeMode = localState.getWriteMode()
+   const result = await ghBridge.approvePR(repo as string, number as number, writeMode)
+diff --git a/src/preload/index.ts b/src/preload/index.ts
+index 89bb090..6cea2c6 100644
+--- a/src/preload/index.ts
++++ b/src/preload/index.ts
+@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('repoAssist', {
+   disableWorkflow: (repo: string, workflowId: number) => ipcRenderer.invoke('gh:disableWorkflow', repo, workflowId),
+   getFileContent: (repo: string, path: string) => ipcRenderer.invoke('gh:getFileContent', repo, path),
+   closeIssue: (repo: string, number: number, reason: string) => ipcRenderer.invoke('gh:closeIssue', repo, number, reason),
++  closePR: (repo: string, number: number) => ipcRenderer.invoke('gh:closePR', repo, number),
+   applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => ipcRenderer.invoke('gh:applyPatchPR', issueRepo, targetRepo, commands),
+   getRepoPermission: (repo: string) => ipcRenderer.invoke('gh:getRepoPermission', repo),
+   getViewerLogin: () => ipcRenderer.invoke('gh:getViewerLogin'),
+diff --git a/src/renderer/components/DetailPanel.tsx b/src/renderer/components/DetailPanel.tsx
+index dbe9e4f..fc1ca55 100644
+--- a/src/renderer/components/DetailPanel.tsx
++++ b/src/renderer/components/DetailPanel.tsx
+@@ -356,7 +356,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged,
+     setBusyAction('close-pr')
+     setActionStatus('Closing PR…')
+     try {
+-      await window.repoAssist.exec(`pr close ${number} -R ${repo}`)
++      await window.repoAssist.closePR(repo, number)
+       if (writeMode) {
+         setActionStatus('PR closed!')
+         setBusyAction(null)
+diff --git a/src/renderer/components/PRItemRow.tsx b/src/renderer/components/PRItemRow.tsx
+index aebb40a..f2f0e37 100644
+--- a/src/renderer/components/PRItemRow.tsx
++++ b/src/renderer/components/PRItemRow.tsx
+@@ -147,7 +147,7 @@ export function usePRListActions(
+     e.stopPropagation()
+     setClosingPR(prNumber)
+     try {
+-      await window.repoAssist.exec(`pr close ${prNumber} -R ${repo}`)
++      await window.repoAssist.closePR(repo, prNumber)
+       setLocalOverrides(prev => ({ ...prev, [prNumber]: { state: 'CLOSED', isDraft: false } }))
+       onPRStateChange?.(prNumber)
+     } finally {
+diff --git a/src/shared/types.ts b/src/shared/types.ts
+index a455421..4f3d148 100644
+--- a/src/shared/types.ts
++++ b/src/shared/types.ts
+@@ -168,6 +168,7 @@ export interface RepoAssistAPI {
+   updatePRBranch: (repo: string, number: number) => Promise<unknown>
+   getFileContent: (repo: string, path: string) => Promise<string | null>
+   closeIssue: (repo: string, number: number, reason: string) => Promise<unknown>
++  closePR: (repo: string, number: number) => Promise<unknown>
+   applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => Promise<void>
+   getRepoPermission: (repo: string) => Promise<string>
+   getViewerLogin: () => Promise<string>
