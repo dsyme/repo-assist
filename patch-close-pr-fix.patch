@@ -1,31 +1,3 @@
-diff --git a/src/main/gh-bridge.test.ts b/src/main/gh-bridge.test.ts
-index 9f4c05c..dd0a90d 100644
---- a/src/main/gh-bridge.test.ts
-+++ b/src/main/gh-bridge.test.ts
-@@ -195,6 +195,23 @@ describe('GhBridge', () => {
-       expect(result.exitCode).toBe(0)
-     })
- 
-+    it('addComment passes body as a separate arg to avoid quoting issues', async () => {
-+      mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
-+      await bridge.addComment('owner/repo', 1, 'body with "double quotes"', true)
-+      expect(mockExecFileAsync).toHaveBeenCalledWith(
-+        'gh',
-+        ['issue', 'comment', '1', '-R', 'owner/repo', '--body', 'body with "double quotes"'],
-+        expect.anything()
-+      )
-+    })
-+
-+    it('closePR returns dry-run result when writeMode is false', async () => {
-+      const result = await bridge.closePR('owner/repo', 1, false)
-+      expect(result.stdout).toContain('DRY RUN')
-+      expect(result.exitCode).toBe(0)
-+      expect(mockExecFileAsync).not.toHaveBeenCalled()
-+    })
-+
-     it('mergePR returns dry-run result when writeMode is false', async () => {
-       const result = await bridge.mergePR('owner/repo', 1, false)
-       expect(result.stdout).toContain('DRY RUN')
 diff --git a/src/main/gh-bridge.ts b/src/main/gh-bridge.ts
 index a814a9d..14e3132 100644
 --- a/src/main/gh-bridge.ts
@@ -147,7 +119,7 @@ index aebb40a..f2f0e37 100644
        onPRStateChange?.(prNumber)
      } finally {
 diff --git a/src/shared/types.ts b/src/shared/types.ts
-index a455421..4f3d148 100644
+index bdd2272..929b976 100644
 --- a/src/shared/types.ts
 +++ b/src/shared/types.ts
 @@ -168,6 +168,7 @@ export interface RepoAssistAPI {
