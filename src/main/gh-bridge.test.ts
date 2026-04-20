@@ -203,6 +203,8 @@ describe('GhBridge', () => {
 
     it('addLabel returns dry-run result when writeMode is false', async () => {
       const result = await bridge.addLabel('owner/repo', 42, 'issue', 'bug', false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
     })
 
     it('cancelRun returns dry-run result when writeMode is false', async () => {
