@@ -1,28 +1,31 @@
 {
-  "last_run": "2026-04-19T06:08:35Z",
-  "run_id": "24622480043",
+  "last_run": "2026-04-20T06:27:46Z",
+  "run_id": "24651770804",
   "comments_made": {},
   "issues_commented": [],
   "fix_attempts": [],
   "improvement_prs": [
-    {"branch": "repo-assist/fix-write-ops-quoting-2026-04-06-50c994935933d080", "pr": 21, "status": "pr_open", "note": "CI passing all 3 platforms. Ready to merge. Bug fix: addComment quoting + closePR write-mode bypass."},
-    {"branch": "repo-assist/feat-reopen-issue-2026-04-06-3e01c2ac1a406a0a", "pr": 22, "status": "pr_open", "note": "Rebased + write-mode test added 2026-04-18. CI pending. Issue #39 blocks push to branch (protected files)."},
-    {"branch": "repo-assist/feat-run-actions-2026-04-07-1e14022587d05348", "pr": 24, "status": "pr_open", "note": "Rebased 2026-04-19, conflict resolved in gh-bridge.test.ts. Not pushed (limit reached). Push next run."},
-    {"branch": "repo-assist/feat-label-management-2026-04-08-369231bcacb3633c", "pr": 25, "status": "pr_open", "note": "Rebased 2026-04-19, conflict resolved in gh-bridge.test.ts. Not pushed (limit reached). Push next run."},
-    {"branch": "repo-assist/eng-vitest-config-2026-04-09-db4e45634a89dbed", "pr": 26, "status": "pr_open", "note": "Pushed 2026-04-19. CI pending."},
-    {"branch": "repo-assist/test-sanitize-html-2026-04-10-702cc62787da9048", "pr": 27, "status": "pr_open", "note": "Pushed 2026-04-19. CI pending."},
-    {"branch": "repo-assist/improve-branch-status-type-2026-04-11-aec3372087b65d3c", "pr": 31, "status": "pr_open", "note": "Pushed 2026-04-19. CI pending."},
-    {"branch": "repo-assist/test-gh-bridge-methods-2026-04-11-df645cc52387b3c4", "pr": 32, "status": "pr_open", "note": "Pushed 2026-04-19. CI pending."},
-    {"branch": "repo-assist/improve-gh-bridge-return-types-2026-04-13-ea543eb122eaf371", "pr": 34, "status": "pr_open", "note": "Pushed 2026-04-19. CI pending."},
-    {"branch": "repo-assist/feat-request-review-2026-04-13-45353f00b6f51ed8", "pr": 35, "status": "pr_open", "note": "Rebased 2026-04-19, clean rebase. Not pushed (limit reached). Push next run."}
+    {"branch": "repo-assist/fix-prtimeline-pagination-2026-04-20", "pr": null, "status": "pr_created", "note": "Fix getPRTimeline --paginate bug: use --jq '.[]' to avoid concatenated JSON arrays. Created 2026-04-20."},
+    {"branch": "repo-assist/test-request-review-2026-04-20", "pr": null, "status": "pr_created", "note": "Add tests for requestReview method (was only untested write-mode method). Created 2026-04-20."}
   ],
   "closed_prs": [],
-  "garbage_prs": [29, 30],
+  "garbage_prs": [],
   "merged_prs": [
     {"number": 14}, {"number": 15}, {"number": 16}, {"number": 19},
-    {"number": 20, "title": "fix(ui): workflow toggle error feedback + RepoIssue comments type fix"}
+    {"number": 20, "title": "fix(ui): workflow toggle error feedback + RepoIssue comments type fix"},
+    {"number": 21, "title": "fix(write-ops): fix addComment body quoting and closePR write-mode bypass"},
+    {"number": 22, "title": "feat(issue): add reopenIssue capability"},
+    {"number": 24, "title": "feat(run-actions): add cancelRun and rerunFailedJobs capabilities"},
+    {"number": 25, "title": "feat(labels): add label management to issue and PR detail views"},
+    {"number": 26, "title": "test(config): align vitest aliases and include patterns with tsconfig"},
+    {"number": 27, "title": "test(sanitize): add tests for sanitizeHtml security utility"},
+    {"number": 31, "title": "refactor(gh-bridge): use PRBranchStatus type for getPRBranchStatus return"},
+    {"number": 32, "title": "test(gh-bridge): add tests for enableWorkflow, disableWorkflow, getFileContent, getWorkflows"},
+    {"number": 34, "title": "refactor(gh-bridge): use shared types for return types of data-fetching methods"},
+    {"number": 35, "title": "feat(pr): add request review capability"},
+    {"number": 44, "title": "ci: add npm test step to CI workflow"}
   ],
   "monthly_activity_issue": 5,
-  "stale_issues_to_close": [23, 28, 33, 36, 37],
-  "notes": "PR #21 is CI-passing and ready to merge (bug fix). PRs #26,#27,#31,#32,#34 pushed 2026-04-19 - CI pending. PRs #24,#25,#35 rebased locally but not pushed (push limit reached). Push them next run. Issue #39 is protected-files notification for PR #22 push. Issues #23,#28,#33,#36,#37 are stale fallback issues (suggest closing). Issue #38 is workflow failure auto-issue (expires Apr 23)."
+  "stale_issues_to_close": [23, 28, 33, 36, 37, 38, 39, 40, 41, 42, 43],
+  "notes": "Maintainer merged 11 PRs on 2026-04-20! PR #45 closed (not merged). PR #46 open (dsyme lockfile update). New PRs created: fix-prtimeline-pagination and test-request-review (PR numbers unknown, check next run). Issues #23,#28,#33,#36,#37 are stale fallback issues. Issues #38-#43 are protected-files/failure fallback issues. Future work: improve getPRTimeline error handling, add more comprehensive integration tests."
 }
