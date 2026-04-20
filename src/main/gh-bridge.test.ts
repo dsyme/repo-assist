@@ -195,10 +195,27 @@ describe('GhBridge', () => {
       expect(result.exitCode).toBe(0)
     })
 
+    it('addComment passes body as a separate arg to avoid quoting issues', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
+      await bridge.addComment('owner/repo', 1, 'body with "double quotes"', true)
+      expect(mockExecFileAsync).toHaveBeenCalledWith(
+        'gh',
+        ['issue', 'comment', '1', '-R', 'owner/repo', '--body', 'body with "double quotes"'],
+        expect.anything()
+      )
+    })
+
     it('mergePR returns dry-run result when writeMode is false', async () => {
       const result = await bridge.mergePR('owner/repo', 1, false)
       expect(result.stdout).toContain('DRY RUN')
       expect(result.exitCode).toBe(0)
+    })
+
+    it('closePR returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.closePR('owner/repo', 1, false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
+      expect(mockExecFileAsync).not.toHaveBeenCalled()
     })
 
     it('cancelRun returns dry-run result when writeMode is false', async () => {
