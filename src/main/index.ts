@@ -538,6 +538,15 @@ ipcHandle('gh:mergePR', async (repo: unknown, number: unknown, bypass: unknown) 
   return result
 })
 
+ipcHandle('gh:closePR', async (repo: unknown, number: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.closePR(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Close PR failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
 ipcHandle('gh:approvePR', async (repo: unknown, number: unknown) => {
   const writeMode = localState.getWriteMode()
   const result = await ghBridge.approvePR(repo as string, number as number, writeMode)

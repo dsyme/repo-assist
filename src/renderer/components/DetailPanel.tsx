@@ -358,7 +358,7 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
     setBusyAction('close-pr')
     setActionStatus('Closing PR…')
     try {
-      await window.repoAssist.exec(`pr close ${number} -R ${repo}`)
+      await window.repoAssist.closePR(repo, number)
       if (writeMode) {
         setActionStatus('PR closed!')
         setBusyAction(null)

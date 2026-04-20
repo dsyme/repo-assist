@@ -1,6 +1,16 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import type { PTALItem } from '../shared/types'
+import type {
+  PTALItem,
+  RepoIssue,
+  RepoPR,
+  RepoRun,
+  RepoWorkflow,
+  IssueDetail,
+  PRDetail,
+  PRCheck,
+  PRTimelineEvent,
+} from '../shared/types'
 
 const execFileAsync = promisify(execFile)
 
@@ -146,31 +156,31 @@ export class GhBridge {
     return result.exitCode === 0
   }
 
-  async getIssues(repo: string): Promise<unknown[]> {
+  async getIssues(repo: string): Promise<RepoIssue[]> {
     const result = await this.exec(
       `issue list -R ${repo} --json number,title,labels,author,createdAt,updatedAt,comments,state --limit 200 --state open`
     )
     if (result.exitCode !== 0) return []
     try {
-      return JSON.parse(result.stdout)
+      return JSON.parse(result.stdout) as RepoIssue[]
     } catch {
       return []
     }
   }
 
-  async getPRs(repo: string): Promise<unknown[]> {
+  async getPRs(repo: string): Promise<RepoPR[]> {
     const result = await this.exec(
       `pr list -R ${repo} --json number,title,author,state,isDraft,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,latestReviews,createdAt,updatedAt,labels,headRefName,baseRefName --limit 50 --state open`
     )
     if (result.exitCode !== 0) return []
     try {
-      return JSON.parse(result.stdout)
+      return JSON.parse(result.stdout) as RepoPR[]
     } catch {
       return []
     }
   }
 
-  async getRuns(repo: string): Promise<unknown[]> {
+  async getRuns(repo: string): Promise<RepoRun[]> {
     // Fetch up to 500 non-cancelled, non-skipped runs via GitHub API
     // gh run list doesn't support excluding by conclusion, so we fetch more and filter
     const result = await this.exec(
@@ -178,7 +188,7 @@ export class GhBridge {
     )
     if (result.exitCode !== 0) return []
     try {
-      const all = JSON.parse(result.stdout) as { conclusion: string; status: string }[]
+      const all = JSON.parse(result.stdout) as RepoRun[]
       return all.filter(r =>
         r.conclusion !== 'cancelled' && r.conclusion !== 'skipped' &&
         r.status !== 'cancelled' && r.status !== 'skipped'
@@ -188,52 +198,52 @@ export class GhBridge {
     }
   }
 
-  async getIssueDetail(repo: string, number: number): Promise<unknown | null> {
+  async getIssueDetail(repo: string, number: number): Promise<IssueDetail | null> {
     const result = await this.exec(
       `issue view ${number} -R ${repo} --json number,title,body,comments,labels,author,createdAt,updatedAt,state`
     )
     if (result.exitCode !== 0) return null
     try {
-      return JSON.parse(result.stdout)
+      return JSON.parse(result.stdout) as IssueDetail
     } catch {
       return null
     }
   }
 
-  async getPRDetail(repo: string, number: number): Promise<unknown | null> {
+  async getPRDetail(repo: string, number: number): Promise<PRDetail | null> {
     const result = await this.exec(
       `pr view ${number} -R ${repo} --json number,title,body,comments,reviews,files,additions,deletions,statusCheckRollup,state,isDraft,reviewDecision,mergeable,mergeStateStatus,labels,author,createdAt,updatedAt,headRefName,commits`
     )
     if (result.exitCode !== 0) return null
     try {
-      return JSON.parse(result.stdout)
+      return JSON.parse(result.stdout) as PRDetail
     } catch {
       return null
     }
   }
 
-  async getPRChecks(repo: string, number: number): Promise<unknown[]> {
+  async getPRChecks(repo: string, number: number): Promise<PRCheck[]> {
     const result = await this.exec(
       `pr view ${number} -R ${repo} --json statusCheckRollup`
     )
     if (result.exitCode !== 0) return []
     try {
-      const data = JSON.parse(result.stdout)
+      const data = JSON.parse(result.stdout) as { statusCheckRollup?: PRCheck[] }
       return data.statusCheckRollup ?? []
     } catch {
       return []
     }
   }
 
-  async getPRTimeline(repo: string, number: number): Promise<unknown[]> {
+  async getPRTimeline(repo: string, number: number): Promise<PRTimelineEvent[]> {
     const result = await this.exec(
       `api repos/${repo}/issues/${number}/timeline --paginate`
     )
     if (result.exitCode !== 0) return []
     try {
-      const events = JSON.parse(result.stdout)
+      const events = JSON.parse(result.stdout) as PRTimelineEvent[]
       // Filter to timeline-relevant events
-      return events.filter((e: { event?: string }) =>
+      return events.filter((e) =>
         ['committed', 'commented', 'head_ref_force_pushed', 'ready_for_review',
          'closed', 'merged', 'reopened', 'convert_to_draft', 'review_requested',
          'reviewed', 'labeled'].includes(e.event ?? '')
@@ -311,14 +321,14 @@ export class GhBridge {
     }
   }
 
-  async getWorkflows(repo: string): Promise<unknown[]> {
+  async getWorkflows(repo: string): Promise<RepoWorkflow[]> {
     const result = await this.exec(
       `api repos/${repo}/actions/workflows --jq '.workflows[] | {id, name, path, state}' --paginate`
     )
     if (result.exitCode !== 0) return []
     try {
       const lines = result.stdout.trim().split('\n').filter(Boolean)
-      return lines.map(line => JSON.parse(line))
+      return lines.map(line => JSON.parse(line) as RepoWorkflow)
     } catch {
       return []
     }
@@ -444,10 +454,15 @@ export class GhBridge {
 
   async addComment(repo: string, number: number, body: string, writeMode: boolean): Promise<GhExecResult> {
     if (!writeMode) {
-      const command = `issue comment ${number} -R ${repo} --body "${body.substring(0, 50)}..."`
-      return this.execWriteOrDryRun(command, false, '[DRY RUN] Comment would be added')
+      return this.execWriteOrDryRun(`issue comment ${number} -R ${repo}`, false, '[DRY RUN] Comment would be added')
     }
-    return this.exec(`issue comment ${number} -R ${repo} --body "${body}"`, 'write')
+    // Use execWithArgs to avoid parseGhArgs mishandling quotes inside the body
+    return this.execWithArgs(['issue', 'comment', String(number), '-R', repo, '--body', body], 'write')
+  }
+
+  async closePR(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `pr close ${number} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] PR would be closed')
   }
 
   async mergePR(repo: string, number: number, writeMode: boolean, bypass: boolean = false): Promise<GhExecResult> {
@@ -771,6 +786,37 @@ ${sections.join('\n\n')}`
         .map(i => ({ number: i.number, title: i.title, author: i.author?.login ?? 'unknown', createdAt: i.createdAt }))
     } catch {
       return []
+    }
+  }
+
+  /** Like exec() but accepts a pre-split args array, bypassing parseGhArgs.
+   *  Use this for commands where user-supplied content (e.g. comment body) is passed
+   *  as an argument value to avoid quoting issues in the string-based parser. */
+  private async execWithArgs(args: string[], mode: 'read' | 'write' | 'dry-run' = 'read'): Promise<GhExecResult> {
+    const command = `gh ${args.map(a => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`
+    const startedAt = new Date().toISOString()
+    const start = Date.now()
+    try {
+      const { stdout, stderr } = await execFileAsync('gh', args, {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      })
+      const durationMs = Date.now() - start
+      const entry: CommandLogEntry = { command, startedAt, durationMs, exitCode: 0, mode }
+      this.addToLog(entry)
+      return { stdout, stderr, exitCode: 0, command, durationMs }
+    } catch (err: unknown) {
+      const durationMs = Date.now() - start
+      const error = err as { stdout?: string; stderr?: string; code?: number }
+      const entry: CommandLogEntry = { command, startedAt, durationMs, exitCode: error.code ?? 1, mode, stderr: error.stderr }
+      this.addToLog(entry)
+      return {
+        stdout: error.stdout ?? '',
+        stderr: error.stderr ?? String(err),
+        exitCode: error.code ?? 1,
+        command,
+        durationMs,
+      }
     }
   }
 
