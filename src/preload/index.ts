@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('repoAssist', {
   getRepoLabels: (repo: string) => ipcRenderer.invoke('gh:getRepoLabels', repo),
   addLabel: (repo: string, number: number, type: 'issue' | 'pr', label: string) => ipcRenderer.invoke('gh:addLabel', repo, number, type, label),
   removeLabel: (repo: string, number: number, type: 'issue' | 'pr', label: string) => ipcRenderer.invoke('gh:removeLabel', repo, number, type, label),
+  reopenIssue: (repo: string, number: number) => ipcRenderer.invoke('gh:reopenIssue', repo, number),
+  closePR: (repo: string, number: number) => ipcRenderer.invoke('gh:closePR', repo, number),
   cancelRun: (repo: string, runId: number) => ipcRenderer.invoke('gh:cancelRun', repo, runId),
   rerunFailedJobs: (repo: string, runId: number) => ipcRenderer.invoke('gh:rerunFailedJobs', repo, runId),
   applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => ipcRenderer.invoke('gh:applyPatchPR', issueRepo, targetRepo, commands),

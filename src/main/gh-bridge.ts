@@ -7,6 +7,7 @@ import type {
   RepoRun,
   RepoWorkflow,
   IssueDetail,
+  PRBranchStatus,
   PRDetail,
   PRCheck,
   PRTimelineEvent,
@@ -259,7 +260,7 @@ export class GhBridge {
   }
 
   /** Check if a PR branch is behind its base branch */
-  async getPRBranchStatus(repo: string, number: number): Promise<{ behindBy: number; status: string }> {
+  async getPRBranchStatus(repo: string, number: number): Promise<PRBranchStatus> {
     // Get the PR's head and base refs
     const prResult = await this.exec(
       `pr view ${number} -R ${repo} --json headRefName,baseRefName`
@@ -382,6 +383,11 @@ export class GhBridge {
     return this.execWriteOrDryRun(command, writeMode, `[DRY RUN] Label '${label}' would be removed`)
   }
 
+  async reopenIssue(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `issue reopen ${number} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Issue would be reopened')
+  }
+
   async cancelRun(repo: string, runId: number, writeMode: boolean): Promise<GhExecResult> {
     const command = `run cancel ${runId} -R ${repo}`
     return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Run would be cancelled')
@@ -469,10 +475,15 @@ export class GhBridge {
 
   async addComment(repo: string, number: number, body: string, writeMode: boolean): Promise<GhExecResult> {
     if (!writeMode) {
-      const command = `issue comment ${number} -R ${repo} --body "${body.substring(0, 50)}..."`
-      return this.execWriteOrDryRun(command, false, '[DRY RUN] Comment would be added')
+      return this.execWriteOrDryRun(`issue comment ${number} -R ${repo}`, false, '[DRY RUN] Comment would be added')
     }
-    return this.exec(`issue comment ${number} -R ${repo} --body "${body}"`, 'write')
+    // Use execWithArgs to avoid parseGhArgs mishandling quotes inside the body
+    return this.execWithArgs(['issue', 'comment', String(number), '-R', repo, '--body', body], 'write')
+  }
+
+  async closePR(repo: string, number: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `pr close ${number} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] PR would be closed')
   }
 
   async mergePR(repo: string, number: number, writeMode: boolean, bypass: boolean = false): Promise<GhExecResult> {
@@ -796,6 +807,37 @@ ${sections.join('\n\n')}`
         .map(i => ({ number: i.number, title: i.title, author: i.author?.login ?? 'unknown', createdAt: i.createdAt }))
     } catch {
       return []
+    }
+  }
+
+  /** Like exec() but accepts a pre-split args array, bypassing parseGhArgs.
+   *  Use this for commands where user-supplied content (e.g. comment body) is passed
+   *  as an argument value to avoid quoting issues in the string-based parser. */
+  private async execWithArgs(args: string[], mode: 'read' | 'write' | 'dry-run' = 'read'): Promise<GhExecResult> {
+    const command = `gh ${args.map(a => (a.includes(' ') ? `"${a}"` : a)).join(' ')}`
+    const startedAt = new Date().toISOString()
+    const start = Date.now()
+    try {
+      const { stdout, stderr } = await execFileAsync('gh', args, {
+        timeout: 30000,
+        maxBuffer: 10 * 1024 * 1024,
+      })
+      const durationMs = Date.now() - start
+      const entry: CommandLogEntry = { command, startedAt, durationMs, exitCode: 0, mode }
+      this.addToLog(entry)
+      return { stdout, stderr, exitCode: 0, command, durationMs }
+    } catch (err: unknown) {
+      const durationMs = Date.now() - start
+      const error = err as { stdout?: string; stderr?: string; code?: number }
+      const entry: CommandLogEntry = { command, startedAt, durationMs, exitCode: error.code ?? 1, mode, stderr: error.stderr }
+      this.addToLog(entry)
+      return {
+        stdout: error.stdout ?? '',
+        stderr: error.stderr ?? String(err),
+        exitCode: error.code ?? 1,
+        command,
+        durationMs,
+      }
     }
   }
 

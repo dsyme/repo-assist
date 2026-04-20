@@ -322,6 +322,15 @@ ipcHandle('gh:addLabel', async (repo: unknown, number: unknown, type: unknown, l
   return result
 })
 
+ipcHandle('gh:reopenIssue', async (repo: unknown, number: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.reopenIssue(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Reopen failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
 ipcHandle('gh:cancelRun', async (repo: unknown, runId: unknown) => {
   const writeMode = localState.getWriteMode()
   const result = await ghBridge.cancelRun(repo as string, runId as number, writeMode)
@@ -547,6 +556,15 @@ ipcHandle('gh:mergePR', async (repo: unknown, number: unknown, bypass: unknown) 
   const result = await ghBridge.mergePR(repo as string, number as number, writeMode, bypass === true)
   if (result.exitCode !== 0) {
     throw new Error(result.stderr || `Merge failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
+ipcHandle('gh:closePR', async (repo: unknown, number: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.closePR(repo as string, number as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Close PR failed (exit code ${result.exitCode})`)
   }
   return result
 })
