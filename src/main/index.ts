@@ -322,11 +322,29 @@ ipcHandle('gh:addLabel', async (repo: unknown, number: unknown, type: unknown, l
   return result
 })
 
+ipcHandle('gh:cancelRun', async (repo: unknown, runId: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.cancelRun(repo as string, runId as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Cancel failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
 ipcHandle('gh:removeLabel', async (repo: unknown, number: unknown, type: unknown, label: unknown) => {
   const writeMode = localState.getWriteMode()
   const result = await ghBridge.removeLabel(repo as string, number as number, type as 'issue' | 'pr', label as string, writeMode)
   if (result.exitCode !== 0) {
     throw new Error(result.stderr || `Remove label failed (exit code ${result.exitCode})`)
+  }
+  return result
+})
+
+ipcHandle('gh:rerunFailedJobs', async (repo: unknown, runId: unknown) => {
+  const writeMode = localState.getWriteMode()
+  const result = await ghBridge.rerunFailedJobs(repo as string, runId as number, writeMode)
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr || `Rerun failed (exit code ${result.exitCode})`)
   }
   return result
 })

@@ -366,6 +366,16 @@ export class GhBridge {
     return this.execWriteOrDryRun(command, writeMode, `[DRY RUN] Label '${label}' would be removed`)
   }
 
+  async cancelRun(repo: string, runId: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `run cancel ${runId} -R ${repo}`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Run would be cancelled')
+  }
+
+  async rerunFailedJobs(repo: string, runId: number, writeMode: boolean): Promise<GhExecResult> {
+    const command = `run rerun ${runId} -R ${repo} --failed`
+    return this.execWriteOrDryRun(command, writeMode, '[DRY RUN] Failed jobs would be re-run')
+  }
+
   async searchRepos(query: string): Promise<unknown[]> {
     // If the query looks like "owner/repo", try fetching it directly first (handles forks
     // which are excluded from GitHub search results)

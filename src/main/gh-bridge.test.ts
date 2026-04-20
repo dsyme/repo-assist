@@ -203,12 +203,20 @@ describe('GhBridge', () => {
 
     it('addLabel returns dry-run result when writeMode is false', async () => {
       const result = await bridge.addLabel('owner/repo', 42, 'issue', 'bug', false)
+    })
+
+    it('cancelRun returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.cancelRun('owner/repo', 12345, false)
       expect(result.stdout).toContain('DRY RUN')
       expect(result.exitCode).toBe(0)
     })
 
     it('removeLabel returns dry-run result when writeMode is false', async () => {
       const result = await bridge.removeLabel('owner/repo', 42, 'pr', 'enhancement', false)
+    })
+
+    it('rerunFailedJobs returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.rerunFailedJobs('owner/repo', 12345, false)
       expect(result.stdout).toContain('DRY RUN')
       expect(result.exitCode).toBe(0)
     })

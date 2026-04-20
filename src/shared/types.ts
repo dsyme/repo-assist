@@ -171,6 +171,8 @@ export interface RepoAssistAPI {
   getRepoLabels: (repo: string) => Promise<{ name: string; color: string }[]>
   addLabel: (repo: string, number: number, type: 'issue' | 'pr', label: string) => Promise<unknown>
   removeLabel: (repo: string, number: number, type: 'issue' | 'pr', label: string) => Promise<unknown>
+  cancelRun: (repo: string, runId: number) => Promise<unknown>
+  rerunFailedJobs: (repo: string, runId: number) => Promise<unknown>
   applyPatchPR: (issueRepo: string, targetRepo: string, commands: string[]) => Promise<void>
   getRepoPermission: (repo: string) => Promise<string>
   getViewerLogin: () => Promise<string>
