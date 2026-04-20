@@ -21,6 +21,7 @@ import {
   SyncIcon,
   AlertIcon,
   CheckIcon,
+  TagIcon,
 } from '@primer/octicons-react'
 import { marked } from 'marked'
 import { IssueDetail, PRDetail, PRCheck, PRTimelineEvent, PRBranchStatus } from '@shared/types'
@@ -193,6 +194,10 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
   const [refreshKey, setRefreshKey] = useState(0)
   const [repoPermission, setRepoPermission] = useState<string | null>(null)
   const [viewerLogin, setViewerLogin] = useState<string | null>(null)
+  const [labelPickerOpen, setLabelPickerOpen] = useState(false)
+  const [availableLabels, setAvailableLabels] = useState<{ name: string; color: string }[]>([])
+  const [labelFetching, setLabelFetching] = useState(false)
+  const [labelBusy, setLabelBusy] = useState<string | null>(null)
   const [reviewerInput, setReviewerInput] = useState('')
   const [showReviewerForm, setShowReviewerForm] = useState(false)
 
@@ -512,6 +517,46 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
     setTimeout(() => setActionStatus(null), 3000)
   }
 
+  const handleOpenLabelPicker = async () => {
+    if (labelPickerOpen) {
+      setLabelPickerOpen(false)
+      return
+    }
+    setLabelFetching(true)
+    try {
+      const labels = await window.repoAssist.getRepoLabels(repo)
+      setAvailableLabels(labels)
+    } catch {
+      setAvailableLabels([])
+    }
+    setLabelFetching(false)
+    setLabelPickerOpen(true)
+  }
+
+  const handleAddLabel = async (label: string) => {
+    setLabelPickerOpen(false)
+    setLabelBusy(label)
+    try {
+      await window.repoAssist.addLabel(repo, number, type, label)
+      // Refresh the detail to show updated labels
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      await window.repoAssist.showMessageBox({ type: 'error', message: 'Failed to add label', detail: String(err), buttons: ['OK'] })
+    }
+    setLabelBusy(null)
+  }
+
+  const handleRemoveLabel = async (label: string) => {
+    setLabelBusy(label)
+    try {
+      await window.repoAssist.removeLabel(repo, number, type, label)
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      await window.repoAssist.showMessageBox({ type: 'error', message: 'Failed to remove label', detail: String(err), buttons: ['OK'] })
+    }
+    setLabelBusy(null)
+  }
+
   const handleRequestReview = async () => {
     const reviewer = reviewerInput.trim()
     if (!reviewer) return
@@ -636,8 +681,46 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
                 </Text>
                 <SafeRelativeTime date={new Date(issueDetail.createdAt)} />
                 {issueDetail.labels?.map(l => (
-                  <Label key={l.name} size="small">{l.name}</Label>
+                  <span key={l.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                    <Label size="small">{l.name}</Label>
+                    <Button
+                      size="small"
+                      variant="invisible"
+                      onClick={() => handleRemoveLabel(l.name)}
+                      disabled={!!labelBusy}
+                      aria-label={`Remove label ${l.name}`}
+                      style={{ padding: '0 2px', minWidth: 0, height: 18 }}
+                    >
+                      {labelBusy === l.name ? <Spinner size="small" /> : <XIcon size={10} />}
+                    </Button>
+                  </span>
                 ))}
+                <Button
+                  size="small"
+                  variant="invisible"
+                  onClick={handleOpenLabelPicker}
+                  disabled={!!labelBusy}
+                  aria-label="Add label"
+                  style={{ padding: '0 4px', minWidth: 0, height: 18 }}
+                >
+                  {labelFetching ? <Spinner size="small" /> : <TagIcon size={12} />}
+                </Button>
+                {labelPickerOpen && (
+                  <select
+                    autoFocus
+                    style={{ fontSize: 12 }}
+                    defaultValue=""
+                    onChange={(e) => { if (e.target.value) handleAddLabel(e.target.value) }}
+                    onBlur={() => setLabelPickerOpen(false)}
+                  >
+                    <option value="">Add label…</option>
+                    {availableLabels
+                      .filter(l => !issueDetail.labels?.some(cl => cl.name === l.name))
+                      .map(l => (
+                        <option key={l.name} value={l.name}>{l.name}</option>
+                      ))}
+                  </select>
+                )}
               </div>
             </div>
           </div>
@@ -754,6 +837,47 @@ export function DetailPanel({ type, repo, number, writeMode, onClose, onMerged, 
                     <span className="diff-add">+{prDetail.additions}</span>
                     <span className="diff-del">−{prDetail.deletions}</span>
                   </span>
+                )}
+                {prDetail.labels?.map(l => (
+                  <span key={l.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                    <Label size="small">{l.name}</Label>
+                    <Button
+                      size="small"
+                      variant="invisible"
+                      onClick={() => handleRemoveLabel(l.name)}
+                      disabled={!!labelBusy}
+                      aria-label={`Remove label ${l.name}`}
+                      style={{ padding: '0 2px', minWidth: 0, height: 18 }}
+                    >
+                      {labelBusy === l.name ? <Spinner size="small" /> : <XIcon size={10} />}
+                    </Button>
+                  </span>
+                ))}
+                <Button
+                  size="small"
+                  variant="invisible"
+                  onClick={handleOpenLabelPicker}
+                  disabled={!!labelBusy}
+                  aria-label="Add label"
+                  style={{ padding: '0 4px', minWidth: 0, height: 18 }}
+                >
+                  {labelFetching ? <Spinner size="small" /> : <TagIcon size={12} />}
+                </Button>
+                {labelPickerOpen && (
+                  <select
+                    autoFocus
+                    style={{ fontSize: 12 }}
+                    defaultValue=""
+                    onChange={(e) => { if (e.target.value) handleAddLabel(e.target.value) }}
+                    onBlur={() => setLabelPickerOpen(false)}
+                  >
+                    <option value="">Add label…</option>
+                    {availableLabels
+                      .filter(l => !prDetail.labels?.some(cl => cl.name === l.name))
+                      .map(l => (
+                        <option key={l.name} value={l.name}>{l.name}</option>
+                      ))}
+                  </select>
                 )}
               </div>
             </div>
