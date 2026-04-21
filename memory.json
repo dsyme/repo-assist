@@ -1,12 +1,12 @@
 {
-  "last_run": "2026-04-20T06:27:46Z",
-  "run_id": "24651770804",
+  "last_run": "2026-04-21T06:14:39Z",
+  "run_id": "24707105954",
   "comments_made": {},
   "issues_commented": [],
   "fix_attempts": [],
   "improvement_prs": [
-    {"branch": "repo-assist/fix-prtimeline-pagination-2026-04-20", "pr": null, "status": "pr_created", "note": "Fix getPRTimeline --paginate bug: use --jq '.[]' to avoid concatenated JSON arrays. Created 2026-04-20."},
-    {"branch": "repo-assist/test-request-review-2026-04-20", "pr": null, "status": "pr_created", "note": "Add tests for requestReview method (was only untested write-mode method). Created 2026-04-20."}
+    {"branch": "repo-assist/fix-prtimeline-pagination-2026-04-20-6546e9957532678d", "pr": 47, "status": "open_ci_triggered", "note": "Fix getPRTimeline --paginate bug. Test fix pushed (fe0498e). CI trigger commit pushed 2026-04-21."},
+    {"branch": "repo-assist/eng-node22-ci-2026-04-21", "pr": null, "status": "pr_created", "note": "Upgrade CI Node.js from 20 to 22. Node 20 EOL April 2026. Created 2026-04-21."}
   ],
   "closed_prs": [],
   "garbage_prs": [],
@@ -23,9 +23,11 @@
     {"number": 32, "title": "test(gh-bridge): add tests for enableWorkflow, disableWorkflow, getFileContent, getWorkflows"},
     {"number": 34, "title": "refactor(gh-bridge): use shared types for return types of data-fetching methods"},
     {"number": 35, "title": "feat(pr): add request review capability"},
-    {"number": 44, "title": "ci: add npm test step to CI workflow"}
+    {"number": 44, "title": "ci: add npm test step to CI workflow"},
+    {"number": 46, "title": "Update package-lock.json dependency versions"},
+    {"number": 48, "title": "test(gh-bridge): add tests for requestReview method"}
   ],
   "monthly_activity_issue": 5,
   "stale_issues_to_close": [23, 28, 33, 36, 37, 38, 39, 40, 41, 42, 43],
-  "notes": "Maintainer merged 11 PRs on 2026-04-20! PR #45 closed (not merged). PR #46 open (dsyme lockfile update). New PRs created: fix-prtimeline-pagination and test-request-review (PR numbers unknown, check next run). Issues #23,#28,#33,#36,#37 are stale fallback issues. Issues #38-#43 are protected-files/failure fallback issues. Future work: improve getPRTimeline error handling, add more comprehensive integration tests."
+  "notes": "PRs merged 2026-04-20: #46 (lockfile), #48 (test-requestReview). Open PRs: #47 (fix-prtimeline, CI trigger pushed), #49 (dsyme bundle-deps). Node 22 CI upgrade PR created 2026-04-21 (branch repo-assist/eng-node22-ci-2026-04-21). Next run: check if Node 22 PR appeared with a number; check CI status of PR #47. Future work: add tests for getPRChecks, getIssueDetail, getPRDetail."
 }
