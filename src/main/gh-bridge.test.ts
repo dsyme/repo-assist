@@ -815,4 +815,235 @@ describe('GhBridge', () => {
       expect(args).toContain('owner/repo')
     })
   })
+
+  describe('getIssueDetail', () => {
+    it('returns parsed IssueDetail on success', async () => {
+      const detail = {
+        number: 1,
+        title: 'Bug report',
+        body: 'Something broke',
+        state: 'open',
+        labels: [{ name: 'bug', color: 'd73a4a' }],
+        author: { login: 'user1' },
+        comments: [{ author: { login: 'user2' }, body: 'Confirmed', createdAt: '2024-01-02T00:00:00Z' }],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      }
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(detail), stderr: '' })
+
+      const result = await bridge.getIssueDetail('owner/repo', 1)
+      expect(result).toEqual(detail)
+    })
+
+    it('returns null on exec failure', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('not found'), { code: 1, stderr: 'error', stdout: '' }))
+
+      const result = await bridge.getIssueDetail('owner/repo', 99)
+      expect(result).toBeNull()
+    })
+
+    it('returns null on invalid JSON', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: 'not valid json', stderr: '' })
+
+      const result = await bridge.getIssueDetail('owner/repo', 1)
+      expect(result).toBeNull()
+    })
+
+    it('uses correct gh command', async () => {
+      const detail = { number: 5, title: 'Test', body: '', state: 'open', labels: [], author: { login: 'u' }, comments: [], createdAt: '', updatedAt: '' }
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(detail), stderr: '' })
+
+      await bridge.getIssueDetail('owner/repo', 5)
+      const args: string[] = mockExecFileAsync.mock.calls[0][1] as string[]
+      expect(args).toContain('view')
+      expect(args).toContain('5')
+      expect(args).toContain('-R')
+      expect(args).toContain('owner/repo')
+    })
+  })
+
+  describe('getPRDetail', () => {
+    it('returns parsed PRDetail on success', async () => {
+      const detail = {
+        number: 7,
+        title: 'Add feature',
+        body: 'Implements X',
+        state: 'open',
+        isDraft: false,
+        labels: [],
+        author: { login: 'contributor' },
+        reviewDecision: 'REVIEW_REQUIRED',
+        headRefName: 'feature-branch',
+        additions: 10,
+        deletions: 2,
+        files: [],
+        comments: [],
+        reviews: [],
+        mergeable: 'MERGEABLE',
+        mergeStateStatus: 'CLEAN',
+        statusCheckRollup: [],
+        commits: [],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      }
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(detail), stderr: '' })
+
+      const result = await bridge.getPRDetail('owner/repo', 7)
+      expect(result).toEqual(detail)
+    })
+
+    it('returns null on exec failure', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('fail'), { code: 1, stderr: 'err', stdout: '' }))
+
+      const result = await bridge.getPRDetail('owner/repo', 1)
+      expect(result).toBeNull()
+    })
+
+    it('returns null on invalid JSON', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '{broken', stderr: '' })
+
+      const result = await bridge.getPRDetail('owner/repo', 1)
+      expect(result).toBeNull()
+    })
+
+    it('uses correct gh command', async () => {
+      const detail = { number: 3, title: '', body: '', state: 'open', isDraft: false, labels: [], author: { login: '' }, reviewDecision: '', headRefName: '', additions: 0, deletions: 0, files: [], comments: [], reviews: [], mergeable: '', mergeStateStatus: '', statusCheckRollup: [], commits: [], createdAt: '', updatedAt: '' }
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(detail), stderr: '' })
+
+      await bridge.getPRDetail('owner/repo', 3)
+      const args: string[] = mockExecFileAsync.mock.calls[0][1] as string[]
+      expect(args).toContain('view')
+      expect(args).toContain('3')
+      expect(args).toContain('-R')
+      expect(args).toContain('owner/repo')
+    })
+  })
+
+  describe('getPRChecks', () => {
+    it('returns statusCheckRollup array on success', async () => {
+      const checks = [
+        { __typename: 'CheckRun', name: 'CI', status: 'COMPLETED', conclusion: 'SUCCESS', workflowName: 'CI', detailsUrl: '', startedAt: '', completedAt: '' },
+      ]
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify({ statusCheckRollup: checks }), stderr: '' })
+
+      const result = await bridge.getPRChecks('owner/repo', 1)
+      expect(result).toEqual(checks)
+    })
+
+    it('returns empty array when statusCheckRollup is missing', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify({}), stderr: '' })
+
+      const result = await bridge.getPRChecks('owner/repo', 1)
+      expect(result).toEqual([])
+    })
+
+    it('returns empty array on exec failure', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('fail'), { code: 1, stderr: 'err', stdout: '' }))
+
+      const result = await bridge.getPRChecks('owner/repo', 1)
+      expect(result).toEqual([])
+    })
+
+    it('returns empty array on invalid JSON', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: 'not-json', stderr: '' })
+
+      const result = await bridge.getPRChecks('owner/repo', 1)
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('getPRDiff', () => {
+    it('returns diff string on success', async () => {
+      const diff = 'diff --git a/foo.ts b/foo.ts\n+++ new content'
+      mockExecFileAsync.mockResolvedValue({ stdout: diff, stderr: '' })
+
+      const result = await bridge.getPRDiff('owner/repo', 5)
+      expect(result).toBe(diff)
+    })
+
+    it('returns empty string on exec failure', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('fail'), { code: 1, stderr: 'err', stdout: '' }))
+
+      const result = await bridge.getPRDiff('owner/repo', 1)
+      expect(result).toBe('')
+    })
+  })
+
+  describe('getRepoPermission', () => {
+    it('returns permission string on success', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: 'admin\n', stderr: '' })
+
+      const result = await bridge.getRepoPermission('owner/repo')
+      expect(result).toBe('admin')
+    })
+
+    it('returns write when push permission only', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: 'write\n', stderr: '' })
+
+      const result = await bridge.getRepoPermission('owner/repo')
+      expect(result).toBe('write')
+    })
+
+    it('returns unknown on exec failure', async () => {
+      mockExecFileAsync.mockRejectedValue(Object.assign(new Error('fail'), { code: 1, stderr: 'err', stdout: '' }))
+
+      const result = await bridge.getRepoPermission('owner/repo')
+      expect(result).toBe('unknown')
+    })
+
+    it('returns unknown when stdout is empty', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '   ', stderr: '' })
+
+      const result = await bridge.getRepoPermission('owner/repo')
+      expect(result).toBe('unknown')
+    })
+  })
+
+  describe('mergePR', () => {
+    it('returns dry-run result when writeMode is false', async () => {
+      const result = await bridge.mergePR('owner/repo', 1, false)
+      expect(result.stdout).toContain('DRY RUN')
+      expect(result.exitCode).toBe(0)
+      expect(mockExecFileAsync).not.toHaveBeenCalled()
+    })
+
+    it('calls gh pr merge on success', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
+
+      const result = await bridge.mergePR('owner/repo', 3, true)
+      expect(result.exitCode).toBe(0)
+      const args: string[] = mockExecFileAsync.mock.calls[0][1] as string[]
+      expect(args).toContain('merge')
+      expect(args).toContain('3')
+      expect(args).toContain('-R')
+      expect(args).toContain('owner/repo')
+    })
+
+    it('falls back to --merge strategy when first attempt fails', async () => {
+      let callCount = 0
+      mockExecFileAsync.mockImplementation(async () => {
+        callCount++
+        if (callCount === 1) {
+          const err = Object.assign(new Error('interactive'), { code: 1, stderr: 'interactive prompt', stdout: '' })
+          throw err
+        }
+        return { stdout: 'Merged', stderr: '' }
+      })
+
+      const result = await bridge.mergePR('owner/repo', 5, true)
+      expect(result.exitCode).toBe(0)
+      // Should have retried with a strategy flag
+      expect(callCount).toBeGreaterThan(1)
+      const secondCallArgs: string[] = mockExecFileAsync.mock.calls[1][1] as string[]
+      expect(secondCallArgs.some(a => ['--merge', '--squash', '--rebase'].includes(a))).toBe(true)
+    })
+
+    it('passes --admin flag when bypass is true', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: '' })
+
+      await bridge.mergePR('owner/repo', 2, true, true)
+      const args: string[] = mockExecFileAsync.mock.calls[0][1] as string[]
+      expect(args).toContain('--admin')
+    })
+  })
 })
