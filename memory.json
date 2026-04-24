@@ -1,12 +1,11 @@
 {
-  "last_run": "2026-04-23T06:18:03Z",
-  "run_id": "24820077236",
+  "last_run": "2026-04-24T06:21:31Z",
+  "run_id": "24875412776",
   "comments_made": {},
   "issues_commented": [],
   "fix_attempts": [],
   "improvement_prs": [
-    {"branch": "repo-assist/perf-parallel-ptal-scan-2026-04-22", "pr": 52, "status": "open", "note": "perf: parallelize scanPTAL across repos. Created 2026-04-22. CI passing (3/3 builds green)."},
-    {"branch": "repo-assist/improve-test-coverage-2026-04-23", "pr": "pending", "status": "open", "note": "test: add 22 tests for getIssueDetail, getPRDetail, getPRChecks, getPRDiff, getRepoPermission, mergePR. Created 2026-04-23. 151 tests passing."}
+    {"branch": "repo-assist/eng-patch-deps-2026-04-24", "pr": 55, "status": "open", "note": "chore(deps): update @primer/primitives 11.7.0→11.7.1, styled-components 6.4.0→6.4.1. Created 2026-04-24. 152 tests passing."}
   ],
   "closed_prs": [],
   "garbage_prs": [],
@@ -27,12 +26,14 @@
     {"number": 46, "title": "Update package-lock.json dependency versions"},
     {"number": 47, "title": "fix(gh-bridge): fix getPRTimeline pagination using --jq '.[]'"},
     {"number": 48, "title": "test(gh-bridge): add tests for requestReview method"},
-    {"number": 49, "title": "chore(deps): bundle minor/patch dependency updates"}
+    {"number": 49, "title": "chore(deps): bundle minor/patch dependency updates"},
+    {"number": 52, "title": "perf(gh-bridge): parallelize scanPTAL across repos"},
+    {"number": 54, "title": "test(gh-bridge): add tests for getIssueDetail, getPRDetail, getPRChecks, getPRDiff, getRepoPermission, mergePR"}
   ],
   "monthly_activity_issue": 5,
   "open_issues": [
     {"number": 53, "title": "ci: upgrade Node.js from 20 to 22 (blocked - workflow permissions)", "note": "Issue #53 contains manual instructions for Node22 upgrade. Cannot be automated due to workflow file restrictions."}
   ],
   "stale_issues_to_close": [],
-  "notes": "PR #52 (perf-parallel-ptal) CI passing, awaiting review. Issue #53 is Node22 instructions (not a real PR). New PR (test-coverage-2026-04-23) created with 22 new tests for getIssueDetail/getPRDetail/getPRChecks/getPRDiff/getRepoPermission/mergePR. Future work: consider adding tests for enrichIssueRefs (currently unexported), getRecentRepos, searchRepos."
+  "notes": "PR #55 (patch-deps) created 2026-04-24: updates @primer/primitives 11.7.0→11.7.1 and styled-components 6.4.0→6.4.1. PRs #52 and #54 merged by maintainer on 2026-04-23. Future work: add tests for enrichIssueRefs (unexported), getRecentRepos, searchRepos. Major updates available: marked 17→18, vite 7→8 (deferred - major bumps need assessment)."
 }
