@@ -19,7 +19,7 @@
     "@primer/react": "^38.19.0",
     "electron": "^41.2.0",
     "electron-vite": "^5.0.0",
-    "marked": "^17.0.6",
+    "marked": "^18.0.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-is": "^19.2.5",
