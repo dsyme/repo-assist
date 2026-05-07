@@ -1,66 +1,18 @@
 {
-  "last_run": "2026-05-01T06:46:43Z",
-  "run_id": "25205445737",
+  "last_run": "2026-05-07T15:55:40Z",
+  "run_id": "25506855421",
   "monthly_activity_issue": "aw_may2026",
   "issue_label_cursor": null,
   "issue_comment_cursor": null,
   "comments_made": {},
   "improvement_prs": [
     {
-      "pr": 63,
-      "branch": "repo-assist/perf-parallel-recap-phases-2026-05-01",
-      "title": "perf(generateRecap): parallelize scanPTAL and supplementary data fetches",
+      "pr": 65,
+      "branch": "repo-assist/test-runAIModel-generateRecap-2026-05-07",
+      "title": "test(gh-bridge): add tests for runAIModel and generateRecap",
       "status": "open",
-      "created": "2026-05-01",
-      "notes": "Parallelizes Phase 1 (scanPTAL) and Phase 2 (supplementary REST calls) in generateRecap. No node_modules in sandbox. CI will run full tests on PR."
-    },
-    {
-      "pr": 62,
-      "branch": "repo-assist/perf-parallel-api-calls-2026-04-30",
-      "title": "perf: parallelize API calls in hasRepoAssistWorkflow, searchRepos, and generateInBackground",
-      "status": "open",
-      "created": "2026-04-30",
-      "notes": "No node_modules in sandbox; no new TS errors in changed files. CI will run full tests on PR."
-    },
-    {
-      "pr": 61,
-      "branch": "repo-assist/improve-gh-bridge-util-tests-2026-04-29-57b64f99015155b0",
-      "title": "test(gh-bridge): export enrichIssueRefs/escapeHtml/RefInfo and add 26 tests for utility functions",
-      "status": "open",
-      "created": "2026-04-29",
-      "notes": "CI passing on all 3 OS targets. Waiting for maintainer review."
-    },
-    {
-      "pr": 59,
-      "branch": "repo-assist/test-remaining-methods-2026-04-28-23db9552d1d0fec8",
-      "title": "test(gh-bridge): add tests for reopenIssue, createRepoAssistApp, saveRemoteRepoList, installModelsExtension, ensureAwExtension",
-      "status": "open",
-      "created": "2026-04-28",
-      "notes": "CI passing. Waiting for maintainer review."
-    },
-    {
-      "pr": 58,
-      "branch": "repo-assist/test-remaining-gh-bridge-2026-04-27-b490096f96e99aad",
-      "title": "test(gh-bridge): add 25 tests for getUsername, checkRepoAssistAppExists, write paths, extensions, graphqlExec",
-      "status": "open",
-      "created": "2026-04-27",
-      "notes": "CI passing. Waiting for maintainer review."
-    },
-    {
-      "pr": 57,
-      "branch": "repo-assist/improve-gh-bridge-tests-2026-04-26-c1b5c5e52ab51271",
-      "title": "test(gh-bridge): add tests for addComment, closeIssue, closePR, getMonthlyActivity, getEvents, hasRepoAssistWorkflow",
-      "status": "open",
-      "created": "2026-04-26",
-      "notes": "CI passing. Waiting for maintainer review."
-    },
-    {
-      "pr": 56,
-      "branch": "repo-assist/improve-repo-search-types-971d7bf12621e28a",
-      "title": "refactor(types): add RepoSearchResult type, improve searchRepos/getRecentRepos typing",
-      "status": "open",
-      "created": "2026-04-25",
-      "notes": "CI passing on all 3 OS targets. Waiting for maintainer review."
+      "created": "2026-05-07",
+      "notes": "9 tests for runAIModel (all error paths), 4 tests for generateRecap (quiet path, sinceDate, single-repo, active path). CI will validate."
     }
   ],
   "open_issues": [
@@ -81,10 +33,10 @@
     }
   ],
   "eng_checks": {
-    "dependabot_prs_checked": "2026-04-24",
+    "dependabot_prs_checked": "2026-05-07",
     "node_version_checked": "2026-04-22",
-    "deps_checked": "2026-04-28",
+    "deps_checked": "2026-05-07",
     "marked_upgrade_issue": 60
   },
-  "notes": "7 open Repo Assist PRs (#56-#63). April monthly activity issue #5 closed; new May issue created. PRs #56-#61 are test/refactor improvements; CI passing all. PRs #62 and #63 are perf improvements (parallel API calls). No user-created bugs found in any run. Future: add tests for generateRecap/runAIModel if possible."
+  "notes": "Previous PRs #56-#63 all merged by maintainer. 1 open Repo Assist PR (#65: runAIModel/generateRecap tests). No user-created bugs found. All 4 open issues are Repo Assist-created (blocked deps/CI). Future: investigate vite 7→8 upgrade."
 }
