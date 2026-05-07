@@ -1690,4 +1690,178 @@ describe('GhBridge', () => {
       await expect(bridge.graphqlExec('{ viewer { login } }', {})).rejects.toThrow()
     })
   })
+
+  describe('runAIModel', () => {
+    it('returns trimmed stdout on success', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '  Hello from AI  ', stderr: '' })
+
+      const result = await bridge.runAIModel('my prompt')
+      expect(result).toBe('Hello from AI')
+    })
+
+    it('returns stderr when stdout is empty', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: '', stderr: 'response from stderr\n' })
+
+      const result = await bridge.runAIModel('my prompt')
+      expect(result).toBe('response from stderr')
+    })
+
+    it('passes prompt as argument to gh models run', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: 'ok', stderr: '' })
+
+      await bridge.runAIModel('test prompt')
+      const args: string[] = mockExecFileAsync.mock.calls[0][1] as string[]
+      expect(args).toContain('models')
+      expect(args).toContain('run')
+      expect(args).toContain('test prompt')
+    })
+
+    it('logs the command on success', async () => {
+      mockExecFileAsync.mockResolvedValue({ stdout: 'answer', stderr: '' })
+
+      await bridge.runAIModel('some prompt')
+      const log = bridge.getCommandLog()
+      expect(log).toHaveLength(1)
+      expect(log[0].exitCode).toBe(0)
+      expect(log[0].command).toContain('models run')
+    })
+
+    it('throws rate limit error on 429 message', async () => {
+      const err = Object.assign(new Error('rate limit exceeded'), { code: 1, stdout: '', stderr: 'rate limit exceeded' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow('Rate limit exceeded')
+    })
+
+    it('throws rate limit error on 429 status code in stderr', async () => {
+      const err = Object.assign(new Error('error'), { code: 1, stdout: '', stderr: 'HTTP 429 Too Many Requests' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow('Rate limit exceeded')
+    })
+
+    it('throws auth error on 401 message', async () => {
+      const err = Object.assign(new Error('401'), { code: 1, stdout: '', stderr: 'HTTP 401 Unauthorized' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow('authentication failed')
+    })
+
+    it('throws auth error on 403 message', async () => {
+      const err = Object.assign(new Error('403'), { code: 1, stdout: '', stderr: '403 Forbidden' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow('authentication failed')
+    })
+
+    it('throws auth error on "not found" message', async () => {
+      const err = Object.assign(new Error('not found'), { code: 1, stdout: '', stderr: 'model not found' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow('authentication failed')
+    })
+
+    it('throws generic AI model error for other failures', async () => {
+      const err = Object.assign(new Error('unexpected'), { code: 1, stdout: '', stderr: 'something went wrong' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow('AI model error')
+    })
+
+    it('logs the command on failure', async () => {
+      const err = Object.assign(new Error('fail'), { code: 2, stdout: '', stderr: 'some error' })
+      mockExecFileAsync.mockRejectedValue(err)
+
+      await expect(bridge.runAIModel('prompt')).rejects.toThrow()
+      const log = bridge.getCommandLog()
+      expect(log).toHaveLength(1)
+      expect(log[0].exitCode).toBe(2)
+    })
+  })
+
+  describe('generateRecap', () => {
+    it('returns quiet message when repos is empty', async () => {
+      const result = await bridge.generateRecap([], {})
+      expect(result.markdown).toMatch(/## Recap:/)
+      // One of the quiet messages
+      expect(result.markdown).toMatch(/quiet|clear|resting|nothing|peaceful/i)
+      // execFileAsync should not have been called
+      expect(mockExecFileAsync).not.toHaveBeenCalled()
+    })
+
+    it('quiet message includes sinceDate when provided', async () => {
+      const result = await bridge.generateRecap([], {}, '2026-01-01T00:00:00Z')
+      expect(result.markdown).toContain('2026-01-01')
+    })
+
+    it('quiet message for single repo uses repo short name', async () => {
+      // With empty graphql / list responses, all sections will be empty
+      // We mock all exec calls to return empty arrays so generateRecap hits the quiet path
+      mockExecFileAsync.mockImplementation(async (_cmd: string, args: string[]) => {
+        if (args[0] === 'graphql') {
+          // Return empty GraphQL result (no issues/PRs)
+          return {
+            stdout: JSON.stringify({
+              data: {
+                repository: {
+                  issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                  pullRequests: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                },
+              },
+            }),
+            stderr: '',
+          }
+        }
+        // pr list, issue list, getUsername — return empty array or username
+        if (args[0] === 'api' && args.some(a => a.includes('user'))) {
+          return { stdout: JSON.stringify({ login: 'testuser' }), stderr: '' }
+        }
+        return { stdout: '[]', stderr: '' }
+      })
+
+      const result = await bridge.generateRecap(['owner/myrepo'], {})
+      expect(result.markdown).toMatch(/myrepo/i)
+    })
+
+    it('calls runAIModel when activity data exists and returns processed markdown', async () => {
+      const mergedPR = { number: 42, title: 'Fix something', author: { login: 'alice' }, mergedAt: new Date().toISOString() }
+      let callCount = 0
+
+      mockExecFileAsync.mockImplementation(async (_cmd: string, args: string[]) => {
+        callCount++
+        if (args[0] === 'graphql') {
+          return {
+            stdout: JSON.stringify({
+              data: {
+                repository: {
+                  issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                  pullRequests: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+                },
+              },
+            }),
+            stderr: '',
+          }
+        }
+        if (args[0] === 'pr' && args[1] === 'list') {
+          return { stdout: JSON.stringify([mergedPR]), stderr: '' }
+        }
+        if (args[0] === 'issue' && args[1] === 'list') {
+          return { stdout: '[]', stderr: '' }
+        }
+        if (args[0] === 'api' && args.some(a => a.includes('user'))) {
+          return { stdout: JSON.stringify({ login: 'maintainer' }), stderr: '' }
+        }
+        if (args[0] === 'models') {
+          return { stdout: '## Recap: Jan 1 – Jan 15\n\nSome activity happened.', stderr: '' }
+        }
+        return { stdout: '[]', stderr: '' }
+      })
+
+      const result = await bridge.generateRecap(['owner/repo'], {})
+      expect(result.markdown).toContain('Recap')
+      // Should have called models run
+      const modelCalls = (mockExecFileAsync.mock.calls as string[][]).filter(c => c[1]?.[0] === 'models')
+      expect(modelCalls.length).toBeGreaterThan(0)
+    })
+  })
 })
