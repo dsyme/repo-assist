@@ -1027,6 +1027,23 @@ describe('GhBridge', () => {
       expect(results.filter(r => r.fullName === 'alice/exact-repo')).toHaveLength(1)
     })
 
+    it('reuses the parallel search result when direct fetch succeeds (no redundant 3rd call)', async () => {
+      const directRepo = { fullName: 'owner/repo', description: 'Exact' }
+      const searchPayload = [
+        { fullName: 'owner/repo', description: 'Exact' },
+        { fullName: 'owner/repo-fork', description: 'Fork' },
+      ]
+      mockExecFileAsync
+        .mockResolvedValueOnce({ stdout: JSON.stringify(directRepo), stderr: '' })
+        .mockResolvedValueOnce({ stdout: JSON.stringify(searchPayload), stderr: '' })
+
+      const results = await bridge.searchRepos('owner/repo')
+      // Only 2 calls total — the parallel direct+search — no 3rd redundant search
+      expect(mockExecFileAsync).toHaveBeenCalledTimes(2)
+      expect(results[0].fullName).toBe('owner/repo')
+      expect(results[1].fullName).toBe('owner/repo-fork')
+    })
+
     it('falls back to plain search when direct fetch fails', async () => {
       const searchPayload = [{ fullName: 'alice/exact-repo', description: 'Fallback' }]
       mockExecFileAsync

@@ -417,10 +417,7 @@ export class GhBridge {
       if (direct.exitCode === 0 && direct.stdout.trim()) {
         try {
           const repo = JSON.parse(direct.stdout) as RepoSearchResult
-          // Also run a search to supplement with related results
-          const searchResult = await this.exec(
-            `search repos "${query}" --json fullName,description,updatedAt --limit 9`
-          )
+          // Reuse the parallel search result (limit 10) for supplemental results
           const supplemental: RepoSearchResult[] = searchResult.exitCode === 0
             ? JSON.parse(searchResult.stdout).map((r: RepoSearchResult) => ({ fullName: r.fullName, description: r.description }))
             : []
