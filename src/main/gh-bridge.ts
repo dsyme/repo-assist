@@ -988,6 +988,9 @@ ${sections.join('\n\n')}`
   }
 
   private evaluateIssuePTAL(repo: string, issue: GraphQLIssueNode, clearedState: Record<string, string>): PTALItem | null {
+    const normalizedTitle = issue.title.toLowerCase().replace(/[-_]+/g, ' ')
+    if (normalizedTitle.includes('repo assist') && /month(?:ly|y) activity/.test(normalizedTitle)) return null
+
     const lastComment = issue.comments.nodes[0] ?? null
     // Determine last activity
     let activity: PTALItem['lastActivity']

@@ -463,6 +463,49 @@ describe('GhBridge', () => {
       expect(items[0].lastActivity.actor).toBe('github-actions[bot]')
     })
 
+    it('skips Repo Assist monthly activity issues', async () => {
+      const makeIssue = (number: number, title: string) => ({
+        number,
+        title,
+        body: '',
+        author: { login: 'github-actions[bot]' },
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        comments: { nodes: [] },
+      })
+      const issueData = {
+        data: {
+          repository: {
+            issues: {
+              nodes: [
+                makeIssue(42, '[repo-assist] Monthly Activity 2024-01'),
+                makeIssue(44, '[Repo Assist] Monthy Activity 2024-02'),
+                makeIssue(43, 'Monthly Activity from another tool'),
+              ],
+              pageInfo: { hasNextPage: false, endCursor: '' },
+            },
+          },
+        },
+      }
+      const prData = {
+        data: {
+          repository: {
+            pullRequests: {
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: '' },
+            },
+          },
+        },
+      }
+
+      mockExecFileAsync
+        .mockResolvedValueOnce({ stdout: JSON.stringify(issueData), stderr: '' })
+        .mockResolvedValueOnce({ stdout: JSON.stringify(prData), stderr: '' })
+
+      const items = await bridge.scanPTAL(['owner/repo'], {})
+      expect(items.map(item => item.number)).toEqual([43])
+    })
+
     it('skips items where last comment is from a human', async () => {
       const issueData = {
         data: {
