@@ -380,6 +380,13 @@ ipcMain.handle('gh:applyPatchPR', async (_event, issueRepo: string, targetRepo: 
     return
   }
 
+  const bundlePathCommand = commands.find(cmd => cmd.startsWith('bundle_path='))
+  const bundlePathMatch = bundlePathCommand?.match(/^bundle_path=(['"])(\/tmp\/agent-[0-9]+\/[a-zA-Z0-9._-]+\.bundle)\1$/)
+  if (bundlePathCommand && !bundlePathMatch) {
+    log('warn', `applyPatchPR: invalid bundle path: "${bundlePathCommand}"`)
+    return
+  }
+
   // Validate each command is a known safe pattern
   for (const cmd of commands) {
     const stripped = cmd.replace(/'[^']*'/g, 'Q').replace(/"[^"]*"/g, 'Q')
@@ -390,7 +397,9 @@ ipcMain.handle('gh:applyPatchPR', async (_event, issueRepo: string, targetRepo: 
     }
     if (
       !cmd.startsWith('gh run download ') &&
+      !cmd.startsWith('bundle_path=') &&
       !cmd.startsWith('git checkout -b ') &&
+      !cmd.startsWith('git checkout ') &&
       !cmd.startsWith('git am ') &&
       !cmd.startsWith('git push origin ') &&
       !cmd.startsWith('gh pr create ')
@@ -407,10 +416,36 @@ ipcMain.handle('gh:applyPatchPR', async (_event, issueRepo: string, targetRepo: 
   const preClone = commands
     .filter(c => c.startsWith('gh run download '))
     .map(c => c.includes(' -R ') ? c : `${c} -R ${issueRepo}`)
-  const gitCommands = commands.filter(c => c.startsWith('git '))
+  let gitCommands = commands.filter(c => c.startsWith('git '))
   const prCreate = commands.filter(c => c.startsWith('gh pr create '))
 
+  if (bundlePathMatch) {
+    const checkout = gitCommands.find(cmd => cmd.startsWith('git checkout '))
+    const branchMatch = checkout?.match(/^git checkout ['"]?([a-zA-Z0-9][a-zA-Z0-9._/-]*)['"]?$/)
+    if (!branchMatch || branchMatch[1].split('/').includes('..')) {
+      log('warn', `applyPatchPR: invalid bundle checkout command: "${checkout}"`)
+      return
+    }
+
+    const bundlePath = bundlePathMatch[2]
+    const branch = branchMatch[1]
+    const tempRef = `refs/bundles/repo-assist-${salt}`
+    const targetRef = `refs/heads/${branch}`
+    gitCommands = [
+      `bundle_source_ref=$(git bundle list-heads '${bundlePath}' | awk '$2 ~ /^refs\\/heads\\// { print $2 }')`,
+      `if [ -z "$bundle_source_ref" ]; then bundle_source_ref=$(git bundle list-heads '${bundlePath}' | awk '$2 == "HEAD" { print $2 }'); fi`,
+      `if [ "$(printf '%s\\n' "$bundle_source_ref" | sed '/^$/d' | wc -l | tr -d ' ')" != "1" ]; then echo "Expected exactly one bundle source ref, found: $bundle_source_ref" >&2; exit 1; fi`,
+      `git fetch '${bundlePath}' "\${bundle_source_ref}:${tempRef}"`,
+      `git update-ref '${targetRef}' '${tempRef}'`,
+      `git checkout '${branch}'`,
+      'git reset --hard',
+      `git update-ref -d '${tempRef}'`,
+      `git push origin 'HEAD:${targetRef}'`,
+    ]
+  }
+
   const script = [
+    'set -e',
     ...preClone,
     `gh repo clone ${targetRepo} ${repoDir}`,
     `cd ${repoDir}`,
@@ -419,7 +454,7 @@ ipcMain.handle('gh:applyPatchPR', async (_event, issueRepo: string, targetRepo: 
     `echo "Done! Cleaning up temp clone..."`,
     `cd /tmp`,
     `rm -rf ${repoDir}`,
-  ].join(' && ')
+  ].join('\n')
 
   log('info', `applyPatchPR: launching interactive shell with script:\n${script}`)
   openInteractiveShell(script)
