@@ -1,42 +1,26 @@
 {
-  "last_run": "2026-07-30T15:39:07Z",
-  "run_id": "30557326461",
-  "monthly_activity_issue": "aw_jul2026",
+  "last_run": "2026-08-27T23:04:38Z",
+  "run_id": "33124835103",
+  "monthly_activity_issue": "2026-08 (new, created this run)",
   "issue_label_cursor": null,
   "issue_comment_cursor": null,
   "comments_made": {},
   "improvement_prs": [
     {
       "pr": "pending",
-      "branch": "repo-assist/fix-searchRepos-redundant-call",
-      "title": "fix(gh-bridge): reuse parallel search result in searchRepos",
+      "branch": "repo-assist/perf-commandlog-trim-batching-2026-08-27",
+      "title": "perf(gh-bridge): batch command log trimming instead of re-slicing every call",
       "status": "open",
-      "created": "2026-07-30",
-      "notes": "Fixes redundant 3rd API call in searchRepos when owner/repo query direct lookup succeeds. Adds a test."
+      "created": "2026-08-27",
+      "notes": "Task 8 (Performance). Fixed O(n) re-slice on every exec() call once commandLog hit 500-entry cap; now trims in batches at 2x cap. Added test asserting bounded size + most-recent retention. typecheck + 238 tests pass."
     }
   ],
-  "open_issues": [
-    {
-      "number": 53,
-      "title": "ci: upgrade Node.js from 20 to 22 (blocked by workflow permissions)",
-      "notes": "Blocked — workflow files are protected. Manual merge required."
-    },
-    {
-      "number": 55,
-      "title": "chore(deps): update @primer/primitives and styled-components",
-      "notes": "Blocked — package.json/lock protected. Manual merge required."
-    },
-    {
-      "number": 60,
-      "title": "chore(deps): upgrade marked from v17 to v18",
-      "notes": "Blocked — package.json/lock protected. Manual merge required."
-    }
-  ],
+  "open_issues": [],
   "eng_checks": {
     "dependabot_prs_checked": "2026-05-07",
     "node_version_checked": "2026-04-22",
-    "deps_checked": "2026-05-07",
-    "marked_upgrade_issue": 60
+    "deps_checked": "2026-08-27",
+    "marked_upgrade_issue": null
   },
-  "notes": "PR #65 (runAIModel/generateRecap tests) merged by maintainer. Created fix PR for searchRepos redundant call bug. Monthly activity issue for May 2026 (#64) still open — need to create July 2026 issue. No user-created bugs found. All 4 open issues are Repo Assist-created (blocked deps/CI). Future: investigate vite 7→8 upgrade."
+  "notes": "Issues #53, #55, #60 (previously tracked blocked dependency/CI PRs) are now closed by maintainer as not-planned. No open issues remain in the repo (0 open issues, 0 unlabelled). Task 2/1 not applicable this run. Task 10: no blocked in-progress work found: previously blocked items are resolved/closed. Created new Monthly Activity issue for August 2026 (old July one already closed). PR #66 (searchRepos redundant call fix) appears merged in main history (git log shows PR #66 merged). npm install requires ELECTRON_SKIP_BINARY_DOWNLOAD=1 in sandboxed/offline environments (electron postinstall tries to download binary and fails with ENETUNREACH). Future: investigate vite 7->8 major upgrade; consider marked v17->v18 major bump if issue reopened by maintainer."
 }
